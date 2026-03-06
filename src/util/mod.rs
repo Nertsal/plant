@@ -1,3 +1,8 @@
+mod interpolation;
+mod sod;
+
+pub use self::{interpolation::*, sod::*};
+
 use crate::assets::Font;
 
 use geng::prelude::*;

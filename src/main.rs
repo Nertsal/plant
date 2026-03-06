@@ -52,7 +52,7 @@ fn main() {
 
     let mut options = geng::ContextOptions::default();
     options.with_cli(&opts.geng);
-    options.window.title = "Nertplate".into();
+    options.window.title = "Plant 2(d)".into();
 
     Geng::run_with(&options, |geng| async move {
         let main = geng_main(geng, opts);
