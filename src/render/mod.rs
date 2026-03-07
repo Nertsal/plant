@@ -6,9 +6,9 @@ use self::{ui::*, util::*};
 use crate::{game::GameUI, model::Model, prelude::*, ui::layout::AreaOps};
 
 pub struct GameRender {
-    context: Context,
-    util: UtilRender,
-    ui: UiRender,
+    pub context: Context,
+    pub util: UtilRender,
+    pub ui: UiRender,
 }
 
 impl GameRender {

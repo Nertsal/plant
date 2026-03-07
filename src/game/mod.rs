@@ -137,5 +137,15 @@ impl geng::State for GameState {
 
         self.render.draw_game(&self.model, framebuffer);
         self.render.draw_ui(&self.ui, &self.model, framebuffer);
+
+        // Debug
+        // self.render.util.draw_text(
+        //     crate::model::logic::density_near(self.cursor_grid_pos, &self.model.grid).to_string(),
+        //     vec2(0.0, 0.0),
+        //     &self.context.assets.fonts.default,
+        //     util::TextRenderOptions::new(1.0),
+        //     &self.model.camera,
+        //     framebuffer,
+        // );
     }
 }

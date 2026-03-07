@@ -1,4 +1,4 @@
-mod logic;
+pub mod logic;
 
 use crate::prelude::*;
 
