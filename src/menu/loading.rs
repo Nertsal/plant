@@ -121,11 +121,10 @@ impl<T: 'static> geng::State for LoadingScreen<T> {
     }
 
     fn draw(&mut self, framebuffer: &mut ugli::Framebuffer) {
-        ugli::clear(framebuffer, Some(self.options.theme.dark), None, None);
+        ugli::clear(framebuffer, Some(Color::BLACK), None, None);
 
         let framebuffer_size = framebuffer.size().as_f32();
         let font_size = framebuffer_size.y * 0.08;
-        let theme = self.options.theme;
 
         let screen = Aabb2::ZERO.extend_positive(framebuffer_size);
         let camera = &geng::PixelPerfectCamera;
@@ -162,7 +161,7 @@ impl<T: 'static> geng::State for LoadingScreen<T> {
             camera,
             title,
             &self.assets.title,
-            theme.light,
+            Color::WHITE,
         );
 
         // Funny text
@@ -173,7 +172,7 @@ impl<T: 'static> geng::State for LoadingScreen<T> {
                 camera,
                 text,
                 pos,
-                TextRenderOptions::new(font_size).color(theme.light),
+                TextRenderOptions::new(font_size).color(Color::WHITE),
             );
         }
     }

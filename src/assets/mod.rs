@@ -52,8 +52,27 @@ pub struct Palette {
 }
 
 #[derive(geng::asset::Load)]
+pub struct Sprites {
+    pub scissors: PixelTexture,
+}
+
+#[derive(geng::asset::Load)]
+pub struct Sounds {
+    pub ui_click: Rc<geng::Sound>,
+    pub ui_hover: Rc<geng::Sound>,
+}
+
+#[derive(geng::asset::Load)]
+pub struct Fonts {
+    pub default: Rc<Font>,
+}
+
+#[derive(geng::asset::Load)]
 pub struct Assets {
     pub palette: Palette,
+    pub sprites: Sprites,
+    pub sounds: Sounds,
+    pub fonts: Fonts,
 }
 
 impl Assets {

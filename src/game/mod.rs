@@ -1,18 +1,26 @@
-use crate::{model::*, prelude::*, render::*};
+mod ui;
+
+use self::ui::*;
+
+use crate::{model::*, prelude::*, render::*, ui::context::UiContext};
 
 pub struct GameState {
     context: Context,
+    ui_context: UiContext,
 
-    model: Model,
     render: GameRender,
+    model: Model,
+    ui: GameUI,
 }
 
 impl GameState {
     pub fn new(context: Context) -> Self {
         Self {
-            model: Model::new(),
             render: GameRender::new(context.clone()),
+            model: Model::new(),
+            ui: GameUI::new(),
 
+            ui_context: UiContext::new(context.clone()),
             context,
         }
     }

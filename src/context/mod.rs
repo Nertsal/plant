@@ -1,6 +1,7 @@
 mod music;
+mod sfx;
 
-pub use self::music::*;
+pub use self::{music::*, sfx::*};
 
 use crate::prelude::*;
 
@@ -9,39 +10,31 @@ pub struct Context {
     pub geng: Geng,
     pub assets: Rc<Assets>,
     pub music: Rc<MusicManager>,
+    pub sfx: Rc<SfxManager>,
     options: Rc<RefCell<Options>>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct Options {
-    pub theme: Theme,
     pub master_volume: f32,
     pub music_volume: f32,
+}
+
+impl Options {
+    pub fn volume_sfx(&self) -> f32 {
+        self.master_volume
+    }
+
+    pub fn volume_music(&self) -> f32 {
+        self.master_volume * self.music_volume
+    }
 }
 
 impl Default for Options {
     fn default() -> Self {
         Self {
-            theme: Theme::default(),
             master_volume: 0.5,
             music_volume: 1.0,
-        }
-    }
-}
-
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
-pub struct Theme {
-    pub dark: Color,
-    pub light: Color,
-    pub highlight: Color,
-}
-
-impl Default for Theme {
-    fn default() -> Self {
-        Self {
-            dark: Color::try_from("#000000").unwrap(),
-            light: Color::try_from("#ffffff").unwrap(),
-            highlight: Color::try_from("#00ffff").unwrap(),
         }
     }
 }
@@ -49,11 +42,13 @@ impl Default for Theme {
 impl Context {
     pub async fn new(geng: &Geng, assets: &Rc<Assets>) -> Result<Self> {
         let options: Options = preferences::load(crate::OPTIONS_STORAGE).unwrap_or_default();
+        let options_rc = Rc::new(RefCell::new(Options::default()));
         let ctx = Self {
             geng: geng.clone(),
             assets: assets.clone(),
             music: Rc::new(MusicManager::new(geng.clone())),
-            options: Rc::new(RefCell::new(Options::default())),
+            sfx: Rc::new(SfxManager::new(geng.clone(), options_rc.clone())),
+            options: options_rc,
         };
         ctx.force_set_options(options);
         Ok(ctx)
