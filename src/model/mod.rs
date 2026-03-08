@@ -18,16 +18,24 @@ pub struct Model {
     pub drone: Drone,
 }
 
+#[derive(Debug)]
 pub enum DroneTarget {
     MoveTo(vec2<ICoord>),
-    Interact(vec2<ICoord>),
+    Interact(vec2<ICoord>, DroneAction),
     // KillBug(Id),
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum DroneAction {
+    CutPlant,
+}
+
+#[derive(Debug)]
 pub struct Drone {
     pub position: vec2<FCoord>,
     pub velocity: vec2<FCoord>,
     pub target: DroneTarget,
+    pub action_progress: R32,
 }
 
 impl Drone {
@@ -217,6 +225,7 @@ impl Model {
                 position: vec2::ZERO,
                 velocity: vec2::ZERO,
                 target: DroneTarget::MoveTo(vec2::ZERO),
+                action_progress: R32::ZERO,
             },
         }
     }

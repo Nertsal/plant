@@ -11,7 +11,8 @@ impl Model {
 
         self.drone.target = match &tile.tile {
             // Tile::Bug(bug_id) => self.drone.target = DroneTarget::KillBug(bug_id),
-            _ => DroneTarget::Interact(target),
+            Tile::Leaf(_) => DroneTarget::Interact(target, DroneAction::CutPlant),
+            _ => DroneTarget::MoveTo(target),
         };
     }
 

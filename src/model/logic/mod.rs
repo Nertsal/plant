@@ -25,7 +25,7 @@ impl Model {
     fn update_drone(&mut self, delta_time: Time) {
         // Calculate drone's target position
         let target_pos = match self.drone.target {
-            DroneTarget::MoveTo(pos) | DroneTarget::Interact(pos) => {
+            DroneTarget::MoveTo(pos) | DroneTarget::Interact(pos, _) => {
                 self.grid_visual.tile_bounds(pos).center()
             }
         };
@@ -62,6 +62,33 @@ impl Model {
         self.drone.velocity +=
             (target_velocity - self.drone.velocity).clamp_len(..=relevant_acc * delta_time);
         self.drone.position += self.drone.velocity * delta_time;
+
+        // Action
+        if target_distance.as_f32() < 0.001 {
+            // target within reach
+            self.drone_action(delta_time);
+        } else {
+            self.drone.action_progress = R32::ZERO;
+        }
+    }
+
+    fn drone_action(&mut self, delta_time: Time) {
+        match self.drone.target {
+            DroneTarget::MoveTo(_) => {}
+            DroneTarget::Interact(position, action) => {
+                self.drone.action_progress += delta_time; // / self.config.action_duration[action];
+                if self.drone.action_progress >= R32::ONE {
+                    self.drone.action_progress = R32::ZERO;
+                    self.drone.target =
+                        DroneTarget::MoveTo(self.grid_visual.world_to_grid(self.drone.position));
+                    match action {
+                        DroneAction::CutPlant => {
+                            self.cut_plant(position);
+                        }
+                    }
+                }
+            }
+        }
     }
 }
 
