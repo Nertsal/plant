@@ -37,9 +37,10 @@ impl Model {
     fn update_drone(&mut self, delta_time: Time) {
         // Calculate drone's target position
         let target_pos = match self.drone.target {
-            DroneTarget::MoveTo(pos) | DroneTarget::Interact(pos, _) => {
-                self.grid_visual.tile_bounds(pos).center()
-            }
+            DroneTarget::MoveTo(pos)
+            | DroneTarget::Interact(pos, _)
+            | DroneTarget::PlaceTile(pos, _)
+            | DroneTarget::BuyTile(pos, _) => self.grid_visual.tile_bounds(pos).center(),
         };
         let reach = r32(Drone::REACH);
         let offset = (self.drone.position - target_pos).clamp_len(..=reach);
@@ -85,7 +86,7 @@ impl Model {
     }
 
     fn drone_action(&mut self, delta_time: Time) {
-        match self.drone.target {
+        match self.drone.target.clone() {
             DroneTarget::MoveTo(_) => {}
             DroneTarget::Interact(position, action) => {
                 self.drone.action_progress += delta_time; // / self.config.action_duration[action];
@@ -100,6 +101,41 @@ impl Model {
                         DroneAction::Collect => {
                             self.collect(position);
                         }
+                    }
+                }
+            }
+            DroneTarget::PlaceTile(position, tile) => {
+                self.drone.action_progress += delta_time; // / self.config.action_duration[action];
+                if self.drone.action_progress >= R32::ONE {
+                    self.drone.action_progress = R32::ZERO;
+                    self.drone.target =
+                        DroneTarget::MoveTo(self.grid_visual.world_to_grid(self.drone.position));
+                    if self.grid.get_tile(position).is_none()
+                        && let Some((inv_item_idx, (_, count))) = self
+                            .inventory
+                            .iter_mut()
+                            .enumerate()
+                            .find(|(_, (t, _))| *t == tile)
+                    {
+                        if *count > 1 {
+                            *count -= 1;
+                        } else {
+                            self.inventory.remove(inv_item_idx);
+                        }
+                        self.grid.set_tile(position, tile.clone());
+                    }
+                }
+            }
+            DroneTarget::BuyTile(position, tile) => {
+                self.drone.action_progress += delta_time; // / self.config.action_duration[action];
+                if self.drone.action_progress >= R32::ONE {
+                    self.drone.action_progress = R32::ZERO;
+                    self.drone.target =
+                        DroneTarget::MoveTo(self.grid_visual.world_to_grid(self.drone.position));
+                    let cost = 20;
+                    if self.grid.get_tile(position).is_none() && self.money >= cost {
+                        self.grid.set_tile(position, tile.clone());
+                        self.money -= cost;
                     }
                 }
             }

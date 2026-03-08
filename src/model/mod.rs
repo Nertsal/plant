@@ -19,10 +19,12 @@ pub struct Model {
     pub inventory: Vec<(Tile, usize)>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum DroneTarget {
     MoveTo(vec2<ICoord>),
     Interact(vec2<ICoord>, DroneAction),
+    PlaceTile(vec2<ICoord>, Tile),
+    BuyTile(vec2<ICoord>, Tile),
     // KillBug(Id),
 }
 

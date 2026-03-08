@@ -19,23 +19,11 @@ impl Model {
 
     pub fn place_tile(&mut self, target: vec2<ICoord>, tile: Tile) -> bool {
         log::debug!("place tile at {}: {:?}", target, tile);
-        if self.grid.get_tile(target).is_some() {
+        if self.grid.get_tile(target).is_some() || !self.inventory.iter().any(|(t, _)| *t == tile) {
             return false;
         }
 
-        let Some(inv_item_idx) = self.inventory.iter().position(|(t, _)| *t == tile) else {
-            return false;
-        };
-
-        self.grid.set_tile(target, tile);
-
-        if let Some((_, count)) = self.inventory.get_mut(inv_item_idx) {
-            if *count > 1 {
-                *count -= 1;
-            } else {
-                self.inventory.remove(inv_item_idx);
-            }
-        }
+        self.drone.target = DroneTarget::PlaceTile(target, tile);
 
         true
     }
@@ -51,8 +39,7 @@ impl Model {
             return false;
         }
 
-        self.grid.set_tile(target, tile);
-        self.money -= cost;
+        self.drone.target = DroneTarget::BuyTile(target, tile);
 
         true
     }
