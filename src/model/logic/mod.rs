@@ -1,8 +1,6 @@
 mod actions;
 mod plants;
 
-pub use self::{actions::*, plants::*};
-
 use super::*;
 
 impl Model {
@@ -18,6 +16,20 @@ impl Model {
             match &tile.tile {
                 Tile::Leaf(_) => self.update_plant(tile.pos, delta_time),
                 Tile::Light => {}
+                Tile::Seed(plant_kind) => {
+                    let soil = self
+                        .grid
+                        .get_neighbors(tile.pos)
+                        .find(|neighbor| matches!(neighbor.tile, Tile::Soil(_)))
+                        .map(|neighbor| neighbor.pos);
+                    if let Some(soil) = soil {
+                        // Grow into a plant
+                        self.grid
+                            .set_tile(tile.pos, Tile::Leaf(Leaf::new(*plant_kind).root()));
+                        self.grid.set_tile(soil, Tile::Soil(SoilState::Dry));
+                    }
+                }
+                Tile::Soil(_state) => {}
             }
         }
     }

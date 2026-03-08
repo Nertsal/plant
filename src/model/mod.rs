@@ -96,9 +96,18 @@ pub struct Positioned<T> {
 }
 
 #[derive(Debug, Clone)]
+pub enum SoilState {
+    Dry,
+    Watered,
+    // Rich,
+}
+
+#[derive(Debug, Clone)]
 pub enum Tile {
+    Seed(PlantKind),
     Leaf(Leaf),
     Light,
+    Soil(SoilState),
 }
 
 pub struct Grid {
@@ -109,7 +118,8 @@ impl Grid {
     pub fn new() -> Self {
         Self {
             tiles: hashmap! {
-                vec2(0, 1) => Tile::Leaf(Leaf::new(PlantKind::Early).root()),
+                vec2(0, 0) => Tile::Soil(SoilState::Dry),
+                vec2(0, 1) => Tile::Seed(PlantKind::Early),
                 vec2(0, 10) => Tile::Light
             },
         }

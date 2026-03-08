@@ -62,6 +62,10 @@ pub struct Sprites {
 pub struct SpritesTiles {
     pub plant: PixelTexture,
     pub light: PixelTexture,
+    pub seed: PixelTexture,
+    pub soil_dry: PixelTexture,
+    pub soil: PixelTexture,
+    // pub soil_rich: PixelTexture,
 }
 
 #[derive(geng::asset::Load)]

@@ -60,6 +60,11 @@ impl GameRender {
             let texture = match tile.tile {
                 Tile::Leaf(_) => &sprites.tiles.plant,
                 Tile::Light => &sprites.tiles.light,
+                Tile::Seed(_) => &sprites.tiles.seed,
+                Tile::Soil(state) => match state {
+                    SoilState::Dry => &sprites.tiles.soil_dry,
+                    SoilState::Watered => &sprites.tiles.soil,
+                },
             };
             self.util
                 .draw_on_tile(&model.grid_visual, pos, texture, &model.camera, framebuffer);
