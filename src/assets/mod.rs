@@ -46,10 +46,6 @@ fn load_gif(
 pub struct Palette {
     pub background: Color,
     pub text: Color,
-    pub tile_dark: Color,
-    pub tile_lit: Color,
-    pub light: Color,
-    pub plants: HashMap<PlantKind, Color>,
 }
 
 #[derive(geng::asset::Load)]
@@ -57,6 +53,14 @@ pub struct Sprites {
     pub scissors: PixelTexture,
     pub seed: PixelTexture,
     pub coin: PixelTexture,
+    pub tile: PixelTexture,
+    pub tiles: SpritesTiles,
+}
+
+#[derive(geng::asset::Load)]
+pub struct SpritesTiles {
+    pub plant: PixelTexture,
+    pub light: PixelTexture,
 }
 
 #[derive(geng::asset::Load)]

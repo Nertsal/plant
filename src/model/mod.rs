@@ -27,27 +27,17 @@ pub enum PlantKind {
     Early,
 }
 
-pub struct Plant {
+#[derive(Debug, Clone)]
+pub struct Leaf {
     /// Time until the plant attempts to grow.
-    pub growth_timer: Time,
-    /// Position of the plant's root which is permanent.
-    pub root: vec2<ICoord>,
-    /// The stem connects the root with the leaves.
-    pub stem: Vec<vec2<ICoord>>,
-    /// Leaves let the plant grow.
-    /// If there are no leaves but some stem tiles, the plant can no longer grow.
-    /// If there are also no stem tiles, the plant can grow from the root (this is assumed to be the initial state).
-    pub leaves: Vec<vec2<ICoord>>,
+    pub growth_timer: Option<Time>,
     pub kind: PlantKind,
 }
 
-impl Plant {
-    pub fn new(position: vec2<ICoord>, kind: PlantKind) -> Self {
+impl Leaf {
+    pub fn new(kind: PlantKind) -> Self {
         Self {
-            growth_timer: r32(1.0),
-            root: position,
-            stem: vec![],
-            leaves: vec![],
+            growth_timer: Some(r32(1.0)),
             kind,
         }
     }
@@ -65,32 +55,71 @@ impl Light {
     }
 }
 
+#[derive(Debug, Clone)]
+pub struct Positioned<T> {
+    pub pos: vec2<ICoord>,
+    pub tile: T,
+}
+
+#[derive(Debug, Clone)]
+pub enum Tile {
+    Leaf(Leaf),
+    Light,
+}
+
 pub struct Grid {
-    pub plants: Vec<Plant>,
-    pub lights: Vec<Light>,
+    tiles: HashMap<vec2<ICoord>, Tile>,
 }
 
 impl Grid {
     pub fn new() -> Self {
         Self {
-            plants: vec![Plant::new(vec2(0, 1), PlantKind::Early)],
-            lights: vec![Light::new(vec2(0, 20))],
+            tiles: hashmap! {
+                vec2(0, 1) => Tile::Leaf(Leaf::new(PlantKind::Early)),
+                vec2(0, 10) => Tile::Light
+            },
         }
     }
 
-    pub fn is_tile_lit(&self, pos: vec2<ICoord>) -> bool {
-        self.lights.iter().any(|light| {
-            let dx = if pos.x < light.pos.min.x {
-                light.pos.min.x - pos.x
-            } else if pos.x > light.pos.max.x {
-                pos.x - light.pos.max.x
-            } else {
-                0
-            };
-            let dy = light.pos.min.y - pos.y;
-            dy > 0 && dy >= dx
-        })
+    pub fn all_positions(&self) -> impl Iterator<Item = vec2<ICoord>> {
+        self.tiles.keys().copied()
     }
+
+    pub fn get_tile(&self, pos: vec2<ICoord>) -> Option<Positioned<&Tile>> {
+        self.tiles.get(&pos).map(|tile| Positioned { pos, tile })
+    }
+
+    pub fn remove_tile(&mut self, pos: vec2<ICoord>) -> Option<Positioned<Tile>> {
+        self.tiles.remove(&pos).map(|tile| Positioned { pos, tile })
+    }
+
+    pub fn set_tile(&mut self, pos: vec2<ICoord>, tile: Tile) -> Option<Positioned<Tile>> {
+        self.tiles
+            .insert(pos, tile)
+            .map(|tile| Positioned { pos, tile })
+    }
+
+    pub fn get_neighbors(&self, pos: vec2<ICoord>) -> Vec<Positioned<&Tile>> {
+        let offsets = [vec2(-1, 0), vec2(0, -1), vec2(1, 0), vec2(0, 1)];
+        offsets
+            .into_iter()
+            .filter_map(|offset| self.get_tile(pos + offset))
+            .collect()
+    }
+
+    // pub fn is_tile_lit(&self, pos: vec2<ICoord>) -> bool {
+    //     self.lights.iter().any(|light| {
+    //         let dx = if pos.x < light.pos.min.x {
+    //             light.pos.min.x - pos.x
+    //         } else if pos.x > light.pos.max.x {
+    //             pos.x - light.pos.max.x
+    //         } else {
+    //             0
+    //         };
+    //         let dy = light.pos.min.y - pos.y;
+    //         dy > 0 && dy >= dx
+    //     })
+    // }
 }
 
 pub struct GridVisual {
@@ -141,14 +170,14 @@ impl Model {
     pub fn new() -> Self {
         Self {
             camera: Camera2d {
-                center: vec2(0.5, 10.0),
+                center: vec2(0.5, 5.0),
                 rotation: Angle::ZERO,
-                fov: Camera2dFov::Vertical(30.0),
+                fov: Camera2dFov::Vertical(15.0),
             },
             grid_visual: GridVisual {
                 center: vec2::ZERO,
                 tile_size: vec2(1.0, 1.0).as_r32(),
-                tile_margin: vec2(0.05, 0.05).as_r32(),
+                tile_margin: vec2(0.0, 0.0).as_r32(),
             },
 
             grid: Grid::new(),

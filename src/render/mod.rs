@@ -3,7 +3,10 @@ pub mod util;
 
 use self::{ui::*, util::*};
 
-use crate::{game::GameUI, model::Model, prelude::*, ui::layout::AreaOps};
+use crate::{game::GameUI, model::*, prelude::*, ui::layout::AreaOps};
+
+/// Full size of a single tile in pixels, used for scaling textures to properly fit on the tile.
+const TILE_SIZE_PIXELS: vec2<usize> = vec2(32, 32);
 
 pub struct GameRender {
     pub context: Context,
@@ -22,48 +25,34 @@ impl GameRender {
 
     pub fn draw_game(&mut self, model: &Model, framebuffer: &mut ugli::Framebuffer) {
         let assets = &self.context.assets;
-        let palette = &assets.palette;
+        let sprites = &assets.sprites;
 
         // Grid
         for x in -20..20 {
             for y in -10..30 {
-                let pos = model.grid_visual.tile_bounds(vec2(x, y));
-                let color = if model.grid.is_tile_lit(vec2(x, y)) {
-                    palette.tile_lit
-                } else {
-                    palette.tile_dark
-                };
-                self.context
-                    .geng
-                    .draw2d()
-                    .quad(framebuffer, &model.camera, pos.as_f32(), color);
+                self.util.draw_on_tile(
+                    &model.grid_visual,
+                    vec2(x, y),
+                    &sprites.tile,
+                    &model.camera,
+                    framebuffer,
+                );
             }
         }
 
-        // Lights
-        for light in &model.grid.lights {
-            let color = palette.light;
-            let pos = model.grid_visual.multitile_bounds(light.pos);
-            self.context
-                .geng
-                .draw2d()
-                .quad(framebuffer, &model.camera, pos.as_f32(), color);
-        }
-
-        // Plants
-        for plant in &model.grid.plants {
-            let color = Color::GREEN;
-            for pos in itertools::chain![
-                [plant.root],
-                plant.stem.iter().copied(),
-                plant.leaves.iter().copied()
-            ] {
-                let tile = model.grid_visual.tile_bounds(pos).as_f32();
-                self.context
-                    .geng
-                    .draw2d()
-                    .quad(framebuffer, &model.camera, tile, color);
-            }
+        // Tiles
+        let mut positions: Vec<_> = model.grid.all_positions().collect();
+        positions.sort_by_key(|pos| -pos.y);
+        for pos in positions {
+            let Some(tile) = model.grid.get_tile(pos) else {
+                continue;
+            };
+            let texture = match tile.tile {
+                Tile::Leaf(_) => &sprites.tiles.plant,
+                Tile::Light => &sprites.tiles.light,
+            };
+            self.util
+                .draw_on_tile(&model.grid_visual, pos, texture, &model.camera, framebuffer);
         }
     }
 
@@ -93,7 +82,7 @@ impl GameRender {
         );
 
         self.ui
-            .draw_quad(ui.scissors.position, palette.tile_lit, framebuffer);
+            .draw_quad(ui.scissors.position, Color::GRAY, framebuffer);
         self.ui.draw_texture(
             ui.scissors.position,
             &sprites.scissors,
@@ -103,7 +92,7 @@ impl GameRender {
         );
 
         self.ui
-            .draw_quad(ui.seed.position, palette.tile_lit, framebuffer);
+            .draw_quad(ui.seed.position, Color::GRAY, framebuffer);
         self.ui.draw_texture(
             ui.seed.position,
             &sprites.seed,

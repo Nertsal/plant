@@ -54,10 +54,7 @@ impl GameState {
             let target = self.cursor_grid_pos;
             match item {
                 Item::Scissors => {
-                    if let Some(plant_idx) = self.model.grid.plants.iter_mut().position(|plant| {
-                        plant.stem.contains(&target) || plant.leaves.contains(&target)
-                    }) {
-                        self.model.cut_plant(plant_idx);
+                    if self.model.cut_plant(target) {
                         self.input_state = InputState::Idle;
                     }
                 }
