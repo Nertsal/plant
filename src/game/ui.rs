@@ -29,7 +29,7 @@ impl GameUI {
     }
 
     pub fn layout(&mut self, screen: Aabb2<f32>, context: &mut UiContext) {
-        let layout_size = screen.height() * 0.05;
+        // let layout_size = screen.height() * 0.05;
         let pixel_scale = get_pixel_scale(screen.size().map(|x| x as usize));
 
         // Inventory

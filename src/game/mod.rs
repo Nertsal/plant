@@ -26,7 +26,7 @@ pub struct CursorState {
 #[derive(Debug)]
 pub enum InputState {
     Idle,
-    // PlaceBlock,
+    PlaceTile(Tile),
 }
 
 impl GameState {
@@ -50,9 +50,21 @@ impl GameState {
     }
 
     fn left_click(&mut self) {
-        if let InputState::Idle = &self.input_state {
-            let target = self.cursor.grid_pos;
-            self.model.interact_with(target);
+        if self.ui.inventory.hovered {
+            // Focus UI first
+            return;
+        }
+
+        let target = self.cursor.grid_pos;
+        match &self.input_state {
+            InputState::Idle => {
+                self.model.interact_with(target);
+            }
+            InputState::PlaceTile(tile) => {
+                if self.model.place_tile(target, tile.clone()) {
+                    self.input_state = InputState::Idle;
+                }
+            }
         }
     }
 }
@@ -63,7 +75,14 @@ impl geng::State for GameState {
 
         let delta_time = Time::new(delta_time as f32);
         self.model.update(delta_time);
-        // self.model.drone.position = self.cursor.world_pos;
+
+        // UI events
+        for (widget, (tile, _)) in self.ui.inventory_items.iter().zip(&self.model.inventory) {
+            if widget.mouse_left.clicked {
+                self.input_state = InputState::PlaceTile(tile.clone());
+                break;
+            }
+        }
     }
 
     fn handle_event(&mut self, event: geng::Event) {
@@ -106,7 +125,7 @@ impl geng::State for GameState {
         self.ui_context.frame_end();
 
         self.render
-            .draw_game(&self.model, &self.cursor, framebuffer);
+            .draw_game(&self.model, &self.cursor, &self.input_state, framebuffer);
         self.render.draw_ui(&self.ui, &self.model, framebuffer);
 
         // Debug

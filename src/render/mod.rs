@@ -4,7 +4,7 @@ pub mod util;
 use self::{ui::*, util::*};
 
 use crate::{
-    game::{CursorState, GameUI},
+    game::{CursorState, GameUI, InputState},
     model::*,
     prelude::*,
     ui::layout::AreaOps,
@@ -32,6 +32,7 @@ impl GameRender {
         &mut self,
         model: &Model,
         cursor: &CursorState,
+        input_state: &InputState,
         framebuffer: &mut ugli::Framebuffer,
     ) {
         let assets = &self.context.assets;
@@ -78,14 +79,34 @@ impl GameRender {
             framebuffer,
         );
 
-        // Cursor selection
-        self.util.draw_on_tile(
-            &model.grid_visual,
-            cursor.grid_pos,
-            &sprites.tile_select,
-            &model.camera,
-            framebuffer,
-        );
+        // Input state
+        match input_state {
+            InputState::Idle => {
+                // Tile highlight
+                self.util.draw_on_tile(
+                    &model.grid_visual,
+                    cursor.grid_pos,
+                    &sprites.tile_select,
+                    &model.camera,
+                    framebuffer,
+                );
+            }
+            InputState::PlaceTile(tile) => {
+                // Tile preview
+                let pos = cursor.grid_pos;
+                if model.grid.get_tile(pos).is_none() {
+                    let texture = sprites.tiles.get_texture(tile);
+                    self.util.draw_on_tile_with(
+                        &model.grid_visual,
+                        pos,
+                        Color::new(0.7, 0.7, 0.7, 0.5),
+                        texture,
+                        &model.camera,
+                        framebuffer,
+                    );
+                }
+            }
+        }
     }
 
     pub fn draw_ui(&mut self, ui: &GameUI, model: &Model, framebuffer: &mut ugli::Framebuffer) {

@@ -56,7 +56,7 @@ pub enum PlantKind {
     Early,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Leaf {
     /// Time until the plant attempts to grow.
     pub growth_timer: Option<Time>,
@@ -96,14 +96,14 @@ pub struct Positioned<T> {
     pub tile: T,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum SoilState {
     Dry,
     Watered,
     // Rich,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Tile {
     Seed(PlantKind),
     Leaf(Leaf),
