@@ -10,16 +10,9 @@ impl Model {
             return false;
         };
 
-        let mut plant_positions = vec![tile.pos];
-        let mut to_check_neighbors: VecDeque<_> = vec![tile].into();
-
-        while let Some(tile) = to_check_neighbors.pop_front() {
-            for tile in self.grid.get_neighbors(tile.pos) {
-                let Tile::Leaf(_) = tile.tile else { continue };
-                plant_positions.push(tile.pos);
-                to_check_neighbors.push_back(tile);
-            }
-        }
+        let plant_positions = get_all_connected(&self.grid, target, |tile| {
+            matches!(tile.tile, Tile::Leaf(_))
+        });
 
         // Earn money
         let size = plant_positions.len();
