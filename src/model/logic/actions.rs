@@ -20,7 +20,13 @@ impl Model {
 
         // Remove stem and leaves
         for pos in plant_positions {
-            self.grid.remove_tile(pos);
+            if let Some(mut tile) = self.grid.remove_tile(pos)
+                && let Tile::Leaf(leaf) = &mut tile.tile
+                && leaf.root
+            {
+                leaf.growth_timer = Some(r32(1.0));
+                self.grid.set_tile(pos, tile.tile);
+            }
         }
 
         true

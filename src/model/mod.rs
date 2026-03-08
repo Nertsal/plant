@@ -31,6 +31,7 @@ pub enum PlantKind {
 pub struct Leaf {
     /// Time until the plant attempts to grow.
     pub growth_timer: Option<Time>,
+    pub root: bool,
     pub kind: PlantKind,
 }
 
@@ -38,8 +39,13 @@ impl Leaf {
     pub fn new(kind: PlantKind) -> Self {
         Self {
             growth_timer: Some(r32(0.5)),
+            root: false,
             kind,
         }
+    }
+
+    pub fn root(self) -> Self {
+        Self { root: true, ..self }
     }
 }
 
@@ -75,7 +81,7 @@ impl Grid {
     pub fn new() -> Self {
         Self {
             tiles: hashmap! {
-                vec2(0, 1) => Tile::Leaf(Leaf::new(PlantKind::Early)),
+                vec2(0, 1) => Tile::Leaf(Leaf::new(PlantKind::Early).root()),
                 vec2(0, 10) => Tile::Light
             },
         }
