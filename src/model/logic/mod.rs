@@ -60,7 +60,7 @@ impl Model {
             let target_speed = (r32(2.0) * deceleration * target_distance)
                 .sqrt()
                 .min(max_speed);
-            target_dir / target_distance * dbg!(target_speed)
+            target_dir / target_distance * target_speed
         };
 
         // Update velocity and position
