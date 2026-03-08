@@ -29,6 +29,7 @@ pub enum DroneTarget {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum DroneAction {
     CutPlant,
+    Collect,
 }
 
 #[derive(Debug)]

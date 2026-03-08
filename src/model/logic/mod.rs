@@ -97,6 +97,9 @@ impl Model {
                         DroneAction::CutPlant => {
                             self.cut_plant(position);
                         }
+                        DroneAction::Collect => {
+                            self.collect(position);
+                        }
                     }
                 }
             }

@@ -12,6 +12,7 @@ impl Model {
         self.drone.target = match &tile.tile {
             // Tile::Bug(bug_id) => self.drone.target = DroneTarget::KillBug(bug_id),
             Tile::Leaf(_) => DroneTarget::Interact(target, DroneAction::CutPlant),
+            Tile::Seed(_) => DroneTarget::Interact(target, DroneAction::Collect),
             _ => DroneTarget::MoveTo(target),
         };
     }
@@ -70,16 +71,22 @@ impl Model {
         true
     }
 
-    /// Attempt to plant a seed of a specific kind at the given position.
-    /// Returns `true` if planted.
-    pub fn plant_seed(&mut self, target: vec2<ICoord>, kind: PlantKind) -> bool {
-        log::debug!("plant at {}: {:?}", target, kind);
-        if self.grid.get_tile(target).is_some() {
-            // Occupied tile
-            return false;
-        }
+    pub fn collect(&mut self, target: vec2<ICoord>) {
+        let Some(tile) = self.grid.get_tile(target) else {
+            return;
+        };
+        log::debug!("collect {}: {:?}", target, tile.tile);
 
-        self.grid.set_tile(target, Tile::Leaf(Leaf::new(kind)));
-        true
+        if let Tile::Seed(_) = tile.tile {
+            let tile = self.grid.remove_tile(target).unwrap();
+            self.inventory_add(tile.tile, 1);
+        }
+    }
+
+    pub fn inventory_add(&mut self, tile: Tile, count: usize) {
+        match self.inventory.iter_mut().find(|(t, _)| *t == tile) {
+            Some((_, available)) => *available += count,
+            None => self.inventory.push((tile, count)),
+        }
     }
 }
