@@ -121,7 +121,7 @@ pub struct Sprites {
     pub tiles: SpritesTiles,
 
     pub ui_window: PixelTexture,
-    pub ui_window_shop: PixelTexture,
+    // pub ui_window_shop: PixelTexture,
 }
 
 #[derive(geng::asset::Load)]

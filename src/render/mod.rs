@@ -17,6 +17,7 @@ pub struct GameRender {
     pub context: Context,
     pub util: UtilRender,
     pub ui: UiRender,
+    pub active_highlight: (vec2<ICoord>, Time),
 }
 
 impl GameRender {
@@ -24,6 +25,7 @@ impl GameRender {
         Self {
             util: UtilRender::new(context.clone()),
             ui: UiRender::new(context.clone()),
+            active_highlight: (vec2::ZERO, Time::ZERO),
             context,
         }
     }
@@ -34,18 +36,54 @@ impl GameRender {
         cursor: &CursorState,
         input_state: &InputState,
         framebuffer: &mut ugli::Framebuffer,
+        delta_time: Time,
     ) {
         let assets = &self.context.assets;
         let sprites = &assets.sprites;
         let palette = &assets.palette;
 
+        if self.active_highlight.0 != cursor.grid_pos {
+            self.active_highlight.1 -= delta_time / r32(0.25);
+            if self.active_highlight.1 <= Time::ZERO {
+                self.active_highlight.0 = cursor.grid_pos;
+            }
+        } else {
+            self.active_highlight.1 += delta_time / r32(0.25);
+        }
+        self.active_highlight.1 = self.active_highlight.1.clamp(Time::ZERO, Time::ONE);
+
+        let highlight_range = model
+            .grid
+            .get_tile(self.active_highlight.0)
+            .and_then(|tile| {
+                let range = match tile.tile {
+                    Tile::Light(_) => Some(assets.config.light_radius),
+                    Tile::Drainer => Some(assets.config.drainer_radius),
+                    Tile::Cutter(_) => Some(assets.config.cutter_radius),
+                    Tile::Sprinkler(_) => Some(1),
+                    _ => None,
+                };
+                range.map(|range| (self.active_highlight.0, range))
+            });
+
         // Grid
         for x in -20..20 {
             for y in -10..30 {
-                self.util.draw_on_tile(
+                let pos = vec2(x, y);
+                let highlight =
+                    highlight_range.is_some_and(|(p, r)| logic::manhattan_distance(pos, p) <= r);
+                let texture = &sprites.tile;
+                let color = if highlight {
+                    let t = self.active_highlight.1.as_f32() * 0.2;
+                    Color::new(1.0 + t, 1.0 + t, 1.0 + t, 1.0)
+                } else {
+                    Color::WHITE
+                };
+                self.util.draw_on_tile_with(
                     &model.grid_visual,
-                    vec2(x, y),
-                    &sprites.tile,
+                    pos,
+                    color,
+                    texture,
                     &model.camera,
                     framebuffer,
                 );

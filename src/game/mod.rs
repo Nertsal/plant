@@ -8,6 +8,7 @@ pub struct GameState {
     context: Context,
     ui_context: UiContext,
     framebuffer_size: vec2<usize>,
+    delta_time: Time,
 
     render: GameRender,
     model: Model,
@@ -46,6 +47,7 @@ impl GameState {
 
             ui_context: UiContext::new(context.clone()),
             framebuffer_size: vec2(1, 1),
+            delta_time: Time::new(0.1),
             context,
         }
     }
@@ -80,6 +82,7 @@ impl geng::State for GameState {
         self.ui_context.update(delta_time as f32);
 
         let delta_time = Time::new(delta_time as f32);
+        self.delta_time = delta_time;
         self.model.update(delta_time);
 
         // UI events
@@ -155,8 +158,13 @@ impl geng::State for GameState {
         );
         self.ui_context.frame_end();
 
-        self.render
-            .draw_game(&self.model, &self.cursor, &self.input_state, framebuffer);
+        self.render.draw_game(
+            &self.model,
+            &self.cursor,
+            &self.input_state,
+            framebuffer,
+            self.delta_time,
+        );
         self.render.draw_ui(&self.ui, &self.model, framebuffer);
 
         // Debug
