@@ -20,13 +20,22 @@ impl Model {
                     let soil = self
                         .grid
                         .get_neighbors(pos)
-                        .find(|neighbor| matches!(neighbor.tile, Tile::Soil(_)))
-                        .map(|neighbor| neighbor.pos);
-                    if let Some(soil) = soil {
+                        .filter_map(|neighbor| {
+                            if let Tile::Soil(soil_state) = neighbor.tile {
+                                Some((neighbor.pos, *soil_state))
+                            } else {
+                                None
+                            }
+                        })
+                        .find(|&(_, state)| match plant_kind {
+                            PlantKind::TypeA => true,
+                            PlantKind::TypeB => state >= SoilState::Watered,
+                        });
+                    if let Some((soil_pos, _soil_state)) = soil {
                         // Grow into a plant
                         self.grid
                             .set_tile(pos, Tile::Leaf(Leaf::new(plant_kind).root()));
-                        self.grid.set_tile(soil, Tile::Soil(SoilState::Dry));
+                        self.grid.set_tile(soil_pos, Tile::Soil(SoilState::Dry));
                     }
                 }
                 Tile::Soil(state) => match state {

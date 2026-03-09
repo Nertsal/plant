@@ -67,8 +67,8 @@ impl Model {
                 && let Tile::Leaf(leaf) = &mut tile.tile
                 && leaf.root
             {
-                leaf.growth_timer = Some(r32(1.0));
-                self.grid.set_tile(pos, tile.tile);
+                // Replace root with a new seed
+                self.grid.set_tile(pos, Tile::Seed(leaf.kind));
             }
         }
 
