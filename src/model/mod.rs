@@ -62,7 +62,7 @@ pub enum PlantKind {
     /// - easy to get eaten by bugs
     TypeA,
     TypeB,
-    // TypeC,
+    TypeC,
     // TypeD,
 }
 
@@ -75,9 +75,9 @@ pub struct Leaf {
 }
 
 impl Leaf {
-    pub fn new(kind: PlantKind, growth_time: Time) -> Self {
+    pub fn new(kind: PlantKind) -> Self {
         Self {
-            growth_timer: Some(growth_time),
+            growth_timer: Some(R32::ONE),
             root: false,
             kind,
         }
@@ -135,10 +135,12 @@ impl Tile {
             Tile::Seed(kind) => match kind {
                 PlantKind::TypeA => "Seed (A)",
                 PlantKind::TypeB => "Seed (B)",
+                PlantKind::TypeC => "Seed (C)",
             },
             Tile::Leaf(leaf) => match leaf.kind {
                 PlantKind::TypeA => "Leaf (A)",
                 PlantKind::TypeB => "Leaf (B)",
+                PlantKind::TypeC => "Leaf (C)",
             },
             Tile::Light(_) => "Light",
             Tile::Soil(state) => match state {
@@ -156,7 +158,7 @@ impl Tile {
 
     pub fn update_order(&self) -> i32 {
         match self {
-            Tile::Drainer => 100, // After soil so it takes water first
+            Tile::Drainer => 100, // After soil and seed so it takes water first
             _ => 0,
         }
     }

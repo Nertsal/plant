@@ -38,6 +38,23 @@ impl Model {
                     }
                 }
                 Tile::Seed(plant_kind) => {
+                    if let PlantKind::TypeC = plant_kind {
+                        // Grow from water
+                        let water = self
+                            .grid
+                            .get_neighbors(pos)
+                            .find(|tile| matches!(tile.tile, Tile::Water(_)))
+                            .map(|tile| tile.pos);
+                        if let Some(water) = water {
+                            // Grow into a plant
+                            self.grid
+                                .set_tile(pos, Tile::Leaf(Leaf::new(plant_kind).root()));
+                            self.grid.remove_tile(water);
+                        }
+                        continue;
+                    }
+
+                    // Grow from soil
                     let soil = self
                         .grid
                         .get_neighbors(pos)
@@ -51,13 +68,12 @@ impl Model {
                         .find(|&(_, state)| match plant_kind {
                             PlantKind::TypeA => true,
                             PlantKind::TypeB => state >= SoilState::Watered,
+                            PlantKind::TypeC => unreachable!(),
                         });
                     if let Some((soil_pos, _soil_state)) = soil {
                         // Grow into a plant
-                        self.grid.set_tile(
-                            pos,
-                            Tile::Leaf(Leaf::new(plant_kind, self.config.plant_growth_time).root()),
-                        );
+                        self.grid
+                            .set_tile(pos, Tile::Leaf(Leaf::new(plant_kind).root()));
                         self.grid.set_tile(soil_pos, Tile::Soil(SoilState::Dry));
                     }
                 }

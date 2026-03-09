@@ -1,6 +1,5 @@
 use super::*;
 
-const MAX_SIZE: usize = 15;
 const SPLIT_CHANCE: f32 = 0.1;
 
 impl Model {
@@ -13,11 +12,13 @@ impl Model {
         };
 
         let mut rng = thread_rng();
+        let plant_config = &self.config.plants[&leaf.kind];
 
         // Update growth timer
         let mut grow = false;
         if let Some(timer) = &mut leaf.growth_timer {
-            *timer -= delta_time;
+            let growth_time = plant_config.growth_time;
+            *timer -= delta_time / growth_time;
             if *timer <= Time::ZERO {
                 // Attempt to grow
                 grow = true;
@@ -37,10 +38,16 @@ impl Model {
             return;
         };
         if get_all_connected(&self.grid, plant.pos, |tile| {
-            matches!(tile.tile, Tile::Leaf(_))
+            if let Tile::Leaf(other) = tile.tile
+                && leaf.kind == other.kind
+            {
+                true
+            } else {
+                false
+            }
         })
         .len()
-            >= MAX_SIZE
+            >= plant_config.max_size
         {
             // Over max size
             return;
@@ -100,14 +107,11 @@ impl Model {
 
         // Spawn new plants
         let kind = leaf.kind;
-        let growth_time = self.config.plant_growth_time;
         if let Some(grow) = grow_left {
-            self.grid
-                .set_tile(grow, Tile::Leaf(Leaf::new(kind, growth_time)));
+            self.grid.set_tile(grow, Tile::Leaf(Leaf::new(kind)));
         }
         if let Some(grow) = grow_right {
-            self.grid
-                .set_tile(grow, Tile::Leaf(Leaf::new(kind, growth_time)));
+            self.grid.set_tile(grow, Tile::Leaf(Leaf::new(kind)));
         }
     }
 }

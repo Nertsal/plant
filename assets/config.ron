@@ -13,7 +13,26 @@ Config(
     light_radius: 17,
     drainer_radius: 7,
 
-    plant_growth_time: 0.5,
+    plants: {
+        TypeA: (
+            growth_time: 0.5,
+            growth_time_dark: 2.0,
+            max_size: 15,
+            price: 2,
+        ),
+        TypeB: (
+            growth_time: 0.5,
+            growth_time_dark: 2.0,
+            max_size: 15,
+            price: 10,
+        ),
+        TypeC: (
+            growth_time: 0.5,
+            growth_time_dark: 2.0,
+            max_size: 6,
+            price: 50,
+        ),
+    },
 
     shop: [
         (
@@ -45,6 +64,11 @@ Config(
             price: 300,
             unlocked_at: 400,
             tile: Drainer,
+        ),
+        (
+            price: 200,
+            unlocked_at: 300,
+            tile: Seed(TypeC),
         ),
     ],
 )

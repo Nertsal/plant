@@ -26,9 +26,16 @@ pub struct Config {
     pub light_radius: ICoord,
     pub drainer_radius: ICoord,
 
-    pub plant_growth_time: Time,
-
+    pub plants: HashMap<PlantKind, ConfigPlant>,
     pub shop: Vec<ConfigShopItem>,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct ConfigPlant {
+    pub growth_time: Time,
+    pub growth_time_dark: Time,
+    pub max_size: usize,
+    pub price: Money,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -119,9 +126,11 @@ pub struct Sprites {
 pub struct SpritesTiles {
     pub plant_a: PixelTexture,
     pub plant_b: PixelTexture,
+    pub plant_c: PixelTexture,
     pub light: PixelTexture,
     pub seed_a: PixelTexture,
     pub seed_b: PixelTexture,
+    pub seed_c: PixelTexture,
     pub soil_dry: PixelTexture,
     pub soil: PixelTexture,
     // pub soil_rich: PixelTexture,
@@ -139,10 +148,12 @@ impl SpritesTiles {
             Tile::Leaf(leaf) => match leaf.kind {
                 PlantKind::TypeA => &self.plant_a,
                 PlantKind::TypeB => &self.plant_b,
+                PlantKind::TypeC => &self.plant_c,
             },
             Tile::Seed(kind) => match kind {
                 PlantKind::TypeA => &self.seed_a,
                 PlantKind::TypeB => &self.seed_b,
+                PlantKind::TypeC => &self.seed_c,
             },
             Tile::Light(_) => &self.light,
             Tile::Soil(state) => match state {

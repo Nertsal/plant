@@ -49,12 +49,18 @@ impl Model {
         let Some(tile) = self.grid.get_tile(target) else {
             return false;
         };
-        let Tile::Leaf(_) = tile.tile else {
+        let Tile::Leaf(leaf) = tile.tile else {
             return false;
         };
 
         let plant_positions = get_all_connected(&self.grid, target, |tile| {
-            matches!(tile.tile, Tile::Leaf(_))
+            if let Tile::Leaf(other) = tile.tile
+                && leaf.kind == other.kind
+            {
+                true
+            } else {
+                false
+            }
         });
 
         // Earn money
