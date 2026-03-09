@@ -11,6 +11,7 @@ Config(
     bug_move_time: 1.5,
 
     light_radius: 17,
+    drainer_radius: 7,
 
     plant_growth_time: 0.5,
 
@@ -40,10 +41,10 @@ Config(
             unlocked_at: 30,
             tile: Light(false),
         ),
-        // (
-        //     price: 300,
-        //     unlocked_at: 400,
-        //     tile: Drainer,
-        // ),
+        (
+            price: 300,
+            unlocked_at: 400,
+            tile: Drainer,
+        ),
     ],
 )

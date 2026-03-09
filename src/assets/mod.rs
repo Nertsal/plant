@@ -24,6 +24,7 @@ pub struct Config {
     pub bug_move_time: Time,
 
     pub light_radius: ICoord,
+    pub drainer_radius: ICoord,
 
     pub plant_growth_time: Time,
 
@@ -129,6 +130,7 @@ pub struct SpritesTiles {
     pub poop: PixelTexture,
     pub power: PixelTexture,
     pub wire: PixelTexture,
+    pub drain: PixelTexture,
 }
 
 impl SpritesTiles {
@@ -152,6 +154,7 @@ impl SpritesTiles {
             Tile::Poop(_) => &self.poop,
             Tile::Power => &self.power,
             Tile::Wire(_) => &self.wire,
+            Tile::Drainer => &self.drain,
         }
     }
 }

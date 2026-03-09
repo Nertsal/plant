@@ -10,7 +10,12 @@ impl Model {
         self.update_drone(delta_time);
 
         // Update tiles
-        let update_order: Vec<vec2<ICoord>> = self.grid.all_positions().collect();
+        let update_order: Vec<vec2<ICoord>> = self
+            .grid
+            .all_tiles()
+            .sorted_by_key(|tile| tile.tile.update_order())
+            .map(|tile| tile.pos)
+            .collect();
         for pos in update_order {
             let Some(tile) = self.grid.get_tile_mut(pos) else {
                 continue;
@@ -211,6 +216,19 @@ impl Model {
                     *lifetime -= delta_time;
                     if *lifetime <= Time::ZERO {
                         self.grid.remove_tile(pos);
+                    }
+                }
+                Tile::Drainer => {
+                    let water = self
+                        .grid
+                        .all_tiles()
+                        .find(|tile| {
+                            matches!(tile.tile, Tile::Water(_))
+                                && manhattan_distance(pos, tile.pos) <= self.config.drainer_radius
+                        })
+                        .map(|tile| tile.pos);
+                    if let Some(water) = water {
+                        self.collect(water);
                     }
                 }
             }

@@ -126,6 +126,7 @@ pub enum Tile {
     Poop(Time),
     Power,
     Wire(bool),
+    Drainer,
 }
 
 impl Tile {
@@ -149,6 +150,14 @@ impl Tile {
             Tile::Poop(_) => "Poop",
             Tile::Power => "Power",
             Tile::Wire(_) => "Wire",
+            Tile::Drainer => "Drainer",
+        }
+    }
+
+    pub fn update_order(&self) -> i32 {
+        match self {
+            Tile::Drainer => 100, // After soil so it takes water first
+            _ => 0,
         }
     }
 
@@ -311,7 +320,7 @@ impl Model {
 
             next_id: 1,
             grid: Grid::new(),
-            money: 200,
+            money: 10000000,
             drone: Drone {
                 position: vec2::ZERO,
                 velocity: vec2::ZERO,
