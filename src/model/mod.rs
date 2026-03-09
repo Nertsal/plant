@@ -32,10 +32,12 @@ pub enum DroneTarget {
     KillBug(Id),
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Hash)]
 pub enum DroneAction {
     CutPlant,
     Collect,
+    PlaceTile,
+    KillBug,
 }
 
 #[derive(Debug)]
@@ -44,13 +46,6 @@ pub struct Drone {
     pub velocity: vec2<FCoord>,
     pub target: DroneTarget,
     pub action_progress: R32,
-}
-
-impl Drone {
-    pub const ACCELERATION: f32 = 20.0;
-    pub const DECELERATION: f32 = 10.0;
-    pub const MAX_SPEED: f32 = 20.0;
-    pub const REACH: f32 = 0.5;
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Hash)]

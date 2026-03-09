@@ -218,7 +218,7 @@ impl GameRender {
             model.drone.velocity.x.signum()
                 * model.drone.velocity.y.signum()
                 * model.drone.velocity.len()
-                / r32(Drone::MAX_SPEED)
+                / assets.config.drone_max_speed
                 * r32(0.5),
         );
         self.util.draw_texture_autoscaled(

@@ -12,6 +12,13 @@ use geng_utils::gif::GifFrame;
 #[derive(geng::asset::Load, Serialize, Deserialize, Debug, Clone)]
 #[load(serde = "ron")]
 pub struct Config {
+    pub drone_acceleration: R32,
+    pub drone_deceleration: R32,
+    pub drone_max_speed: R32,
+    pub drone_reach: R32,
+
+    pub action_duration: HashMap<DroneAction, Time>,
+
     pub water_frequency: R32,
     pub water_lifetime: Time,
     pub poop_lifetime: Time,

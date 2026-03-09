@@ -472,13 +472,13 @@ impl Model {
                 }
             }
         };
-        let reach = r32(Drone::REACH);
+        let reach = self.config.drone_reach;
         let offset = (self.drone.position - target_pos).clamp_len(..=reach);
         let target_pos = target_pos + offset;
 
-        let acceleration = r32(Drone::ACCELERATION);
-        let deceleration = r32(Drone::DECELERATION);
-        let max_speed = r32(Drone::MAX_SPEED);
+        let acceleration = self.config.drone_acceleration;
+        let deceleration = self.config.drone_deceleration;
+        let max_speed = self.config.drone_max_speed;
 
         let target_dir = target_pos - self.drone.position;
         let target_distance = target_dir.len();
@@ -519,7 +519,7 @@ impl Model {
         match self.drone.target.clone() {
             DroneTarget::MoveTo(_) => {}
             DroneTarget::Interact(position, action) => {
-                self.drone.action_progress += delta_time; // / self.config.action_duration[action];
+                self.drone.action_progress += delta_time / self.config.action_duration[&action];
                 if self.drone.action_progress >= R32::ONE {
                     self.drone.action_progress = R32::ZERO;
                     self.drone.target =
@@ -531,11 +531,13 @@ impl Model {
                         DroneAction::Collect => {
                             self.collect(position);
                         }
+                        DroneAction::PlaceTile | DroneAction::KillBug => unreachable!(),
                     }
                 }
             }
             DroneTarget::KillBug(bug_id) => {
-                self.drone.action_progress += delta_time;
+                self.drone.action_progress +=
+                    delta_time / self.config.action_duration[&DroneAction::KillBug];
                 if self.drone.action_progress >= R32::ONE {
                     self.drone.action_progress = R32::ZERO;
                     self.drone.target =
@@ -556,7 +558,8 @@ impl Model {
                 }
             }
             DroneTarget::PlaceTile(position, tile) => {
-                self.drone.action_progress += delta_time; // / self.config.action_duration[action];
+                self.drone.action_progress +=
+                    delta_time / self.config.action_duration[&DroneAction::PlaceTile];
                 if self.drone.action_progress >= R32::ONE {
                     self.drone.action_progress = R32::ZERO;
                     self.drone.target =
@@ -578,7 +581,8 @@ impl Model {
                 }
             }
             DroneTarget::BuyTile(position, tile) => {
-                self.drone.action_progress += delta_time; // / self.config.action_duration[action];
+                self.drone.action_progress +=
+                    delta_time / self.config.action_duration[&DroneAction::PlaceTile];
                 if self.drone.action_progress >= R32::ONE {
                     self.drone.action_progress = R32::ZERO;
                     self.drone.target =
