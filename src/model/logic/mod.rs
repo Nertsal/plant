@@ -69,6 +69,7 @@ impl Model {
                             PlantKind::TypeA => true,
                             PlantKind::TypeB => state >= SoilState::Watered,
                             PlantKind::TypeC => unreachable!(),
+                            PlantKind::TypeD => state >= SoilState::Rich,
                         });
                     if let Some((soil_pos, _soil_state)) = soil {
                         // Grow into a plant
@@ -91,7 +92,20 @@ impl Model {
                             }
                         }
                     }
-                    SoilState::Watered => {}
+                    SoilState::Watered => {
+                        let poop = self
+                            .grid
+                            .get_neighbors(pos)
+                            .find(|tile| matches!(tile.tile, Tile::Poop(_)));
+                        if let Some(poop) = poop {
+                            self.grid.remove_tile(poop.pos);
+                            let soil = self.grid.get_tile_mut(pos).unwrap();
+                            if let Tile::Soil(state) = soil.tile {
+                                *state = SoilState::Rich;
+                            }
+                        }
+                    }
+                    SoilState::Rich => {}
                 },
                 Tile::Water(ref mut lifetime) => {
                     *lifetime -= delta_time;

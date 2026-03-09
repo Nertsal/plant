@@ -1,5 +1,5 @@
 Config(
-    water_frequency: 0.1,
+    water_frequency: 0.2,
     water_lifetime: 10.0,
     poop_lifetime: 10.0,
 
@@ -33,6 +33,12 @@ Config(
             growth_time_dark: 2.0,
             max_size: 6,
             price: 50,
+        ),
+        TypeD: (
+            growth_time: 0.5,
+            growth_time_dark: 2.0,
+            max_size: 25,
+            price: 30,
         ),
     },
 
@@ -81,6 +87,11 @@ Config(
             price: 50,
             unlocked_at: 400,
             tile: Pipe(false),
+        ),
+        (
+            price: 500,
+            unlocked_at: 600,
+            tile: Seed(TypeD),
         ),
     ],
 )

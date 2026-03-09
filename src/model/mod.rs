@@ -63,7 +63,7 @@ pub enum PlantKind {
     TypeA,
     TypeB,
     TypeC,
-    // TypeD,
+    TypeD,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -98,7 +98,7 @@ pub struct Positioned<T> {
 pub enum SoilState {
     Dry,
     Watered,
-    // Rich,
+    Rich,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -154,16 +154,19 @@ impl Tile {
                 PlantKind::TypeA => "Seed (A)",
                 PlantKind::TypeB => "Seed (B)",
                 PlantKind::TypeC => "Seed (C)",
+                PlantKind::TypeD => "Seed (D)",
             },
             Tile::Leaf(leaf) => match leaf.kind {
                 PlantKind::TypeA => "Leaf (A)",
                 PlantKind::TypeB => "Leaf (B)",
                 PlantKind::TypeC => "Leaf (C)",
+                PlantKind::TypeD => "Leaf (D)",
             },
             Tile::Light(_) => "Light",
             Tile::Soil(state) => match state {
                 SoilState::Dry => "Dry Soil",
                 SoilState::Watered => "Soil",
+                SoilState::Rich => "Rich Soil",
             },
             Tile::Water(_) => "Water",
             Tile::Bug(_) => "Bug",
