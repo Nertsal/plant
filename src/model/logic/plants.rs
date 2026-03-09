@@ -114,6 +114,7 @@ impl Model {
         let kind = leaf.kind;
         if let Some(grow) = grow_left {
             self.grid.set_tile(grow, Tile::Leaf(Leaf::new(kind)));
+            self.context.sfx.play(&self.context.assets.sounds.grow);
         }
         if let Some(grow) = grow_right {
             self.grid.set_tile(grow, Tile::Leaf(Leaf::new(kind)));

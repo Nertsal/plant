@@ -2,7 +2,10 @@ use super::*;
 
 use crate::{
     render::ui::get_pixel_scale,
-    ui::{layout::AreaOps, widget::WidgetState},
+    ui::{
+        layout::AreaOps,
+        widget::{WidgetSfxConfig, WidgetState},
+    },
 };
 
 pub struct GameUI {
@@ -21,13 +24,18 @@ impl GameUI {
         let shop = &context.assets.config.shop;
         Self {
             inventory: WidgetState::new(),
-            inventory_items: vec![WidgetState::new(); 6],
+            inventory_items: vec![WidgetState::new().with_sfx(WidgetSfxConfig::hover_left()); 6],
 
             shop: WidgetState::new(),
             shop_hover_t: 0.0,
             shop_items: shop
                 .iter()
-                .map(|item| (WidgetState::new(), item.tile.clone()))
+                .map(|item| {
+                    (
+                        WidgetState::new().with_sfx(WidgetSfxConfig::hover_left()),
+                        item.tile.clone(),
+                    )
+                })
                 .collect(),
 
             gold: WidgetState::new(),

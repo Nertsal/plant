@@ -197,6 +197,12 @@ impl SpritesTiles {
 pub struct Sounds {
     pub ui_click: Rc<geng::Sound>,
     pub ui_hover: Rc<geng::Sound>,
+
+    pub bug_eat: Rc<geng::Sound>,
+    pub bug_poop: Rc<geng::Sound>,
+    pub drone_confirm: Rc<geng::Sound>,
+    pub grow: Rc<geng::Sound>,
+    pub rock: Rc<geng::Sound>,
 }
 
 #[derive(geng::asset::Load)]

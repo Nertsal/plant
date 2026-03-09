@@ -37,7 +37,7 @@ impl GameState {
     pub fn new(context: Context) -> Self {
         Self {
             render: GameRender::new(context.clone()),
-            model: Model::new(context.assets.config.clone()),
+            model: Model::new(context.clone(), context.assets.config.clone()),
             ui: GameUI::new(&context),
 
             cursor: CursorState {

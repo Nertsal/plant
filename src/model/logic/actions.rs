@@ -15,6 +15,9 @@ impl Model {
             _ if tile.tile.is_collectable() => DroneTarget::Interact(target, DroneAction::Collect),
             _ => DroneTarget::MoveTo(target),
         };
+        self.context
+            .sfx
+            .play(&self.context.assets.sounds.drone_confirm);
     }
 
     pub fn place_tile(&mut self, target: vec2<ICoord>, tile: Tile) -> bool {
@@ -24,6 +27,9 @@ impl Model {
         }
 
         self.drone.target = DroneTarget::PlaceTile(target, tile);
+        self.context
+            .sfx
+            .play(&self.context.assets.sounds.drone_confirm);
 
         true
     }
@@ -40,6 +46,9 @@ impl Model {
         }
 
         self.drone.target = DroneTarget::BuyTile(target, tile);
+        self.context
+            .sfx
+            .play(&self.context.assets.sounds.drone_confirm);
 
         true
     }
@@ -78,6 +87,8 @@ impl Model {
             }
         }
 
+        self.context.sfx.play(&self.context.assets.sounds.rock);
+
         true
     }
 
@@ -95,6 +106,7 @@ impl Model {
                 _ => {}
             }
             self.inventory_add(tile.tile, 1);
+            self.context.sfx.play(&self.context.assets.sounds.rock);
         }
     }
 

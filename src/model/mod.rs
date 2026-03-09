@@ -9,6 +9,7 @@ pub type Money = i32;
 pub type Id = usize;
 
 pub struct Model {
+    pub context: Context,
     pub camera: Camera2d,
     /// Data used to convert between grid and world coordinates.
     pub grid_visual: GridVisual,
@@ -377,7 +378,7 @@ impl GridVisual {
 }
 
 impl Model {
-    pub fn new(config: Config) -> Self {
+    pub fn new(context: Context, config: Config) -> Self {
         Self {
             camera: Camera2d {
                 center: vec2(0.5, 5.0),
@@ -403,6 +404,7 @@ impl Model {
             inventory: vec![(Tile::Seed(PlantKind::TypeA), 1)],
 
             config,
+            context,
         }
     }
 }

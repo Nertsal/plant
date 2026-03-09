@@ -192,6 +192,7 @@ impl Model {
                                         *eating_timer = self.config.bug_eat_time;
                                         *hunger -= 1;
                                         self.cut_plant_tile(target, false);
+                                        self.context.sfx.play(&self.context.assets.sounds.bug_eat);
                                     }
                                 }
                             } else {
@@ -210,6 +211,7 @@ impl Model {
                                 if let Some(target) = target {
                                     self.grid
                                         .set_tile(target, Tile::Poop(self.config.poop_lifetime));
+                                    self.context.sfx.play(&self.context.assets.sounds.bug_poop);
                                     if let Some(bug) = self.grid.get_tile_mut(pos)
                                         && let Tile::Bug(bug) = bug.tile
                                     {
