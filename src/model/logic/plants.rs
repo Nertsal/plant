@@ -117,7 +117,10 @@ impl Model {
 }
 
 pub fn can_grow_into(pos: vec2<ICoord>, grid: &Grid) -> bool {
-    grid.get_tile(pos).is_none()
+    match grid.get_tile(pos) {
+        Some(tile) => matches!(tile.tile, Tile::Wire(_) | Tile::Pipe(_)),
+        None => true,
+    }
 }
 
 fn density_around(grid: &Grid, pos: vec2<ICoord>) -> f32 {
