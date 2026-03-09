@@ -339,6 +339,7 @@ impl Model {
                         *connected = piped;
                     }
                 }
+                Tile::Rock => {}
             }
         }
 
@@ -398,25 +399,48 @@ impl Model {
     fn rng_spawn(&mut self, delta_time: Time) {
         let mut rng = thread_rng();
 
+        // Rock
+        let chance = self.config.rock_frequency * delta_time;
+        if rng.gen_bool(chance.as_f32().into()) {
+            // attempt to spawn
+            for _ in 0..5 {
+                let distance = rng.gen_range(7..=15);
+                let x = rng.gen_range(-distance..=distance);
+                let y = ((distance as f32).sqr() - (x as f32).sqr()).sqrt() as ICoord;
+                let pos = vec2(x, y);
+                if self.grid.get_tile(pos).is_none() {
+                    self.grid.set_tile(pos, Tile::Rock);
+                    break;
+                }
+            }
+        }
+
         // Water
         let chance = self.config.water_frequency * delta_time;
         if rng.gen_bool(chance.as_f32().into()) {
             // attempt to spawn
-            let anchors = self.grid.all_positions().filter(|pos| {
-                self.grid.get_tile(*pos).is_some_and(|tile| {
-                    if let Tile::Leaf(leaf) = tile.tile {
-                        leaf.growth_timer.is_some()
-                    } else {
-                        false
-                    }
+            let anchors: Vec<_> = self
+                .grid
+                .all_positions()
+                .filter(|pos| {
+                    self.grid.get_tile(*pos).is_some_and(|tile| {
+                        if let Tile::Leaf(leaf) = tile.tile {
+                            leaf.growth_timer.is_some()
+                        } else {
+                            false
+                        }
+                    })
                 })
-            });
-            if let Some(anchor) = anchors.choose(&mut rng) {
-                let offset = vec2(rng.gen_range(-2..=2), rng.gen_range(-2..=2));
-                let target = anchor + offset;
-                if self.grid.get_tile(target).is_none() {
-                    self.grid
-                        .set_tile(target, Tile::Water(self.config.water_lifetime));
+                .collect();
+            for _ in 0..5 {
+                if let Some(&anchor) = anchors.choose(&mut rng) {
+                    let offset = vec2(rng.gen_range(-2..=2), rng.gen_range(-2..=2));
+                    let target = anchor + offset;
+                    if self.grid.get_tile(target).is_none() {
+                        self.grid
+                            .set_tile(target, Tile::Water(self.config.water_lifetime));
+                        break;
+                    }
                 }
             }
         }

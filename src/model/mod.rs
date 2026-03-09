@@ -141,6 +141,7 @@ pub enum Tile {
     Cutter(Cutter),
     Pipe(bool),
     Sprinkler(bool),
+    Rock,
 }
 
 impl Tile {
@@ -173,6 +174,7 @@ impl Tile {
             Tile::Cutter(_) => "Cutter",
             Tile::Pipe(_) => "Pipe",
             Tile::Sprinkler(_) => "Sprinkler",
+            Tile::Rock => "Rock",
         }
     }
 
@@ -196,6 +198,7 @@ impl Tile {
                 | Tile::Pipe(_)
                 | Tile::Cutter(_)
                 | Tile::Sprinkler(_)
+                | Tile::Rock
         )
     }
 

@@ -19,6 +19,7 @@ pub struct Config {
 
     pub action_duration: HashMap<DroneAction, Time>,
 
+    pub rock_frequency: R32,
     pub water_frequency: R32,
     pub water_lifetime: Time,
     pub poop_lifetime: Time,
@@ -154,6 +155,7 @@ pub struct SpritesTiles {
     pub cutter: PixelTexture,
     pub pipe: PixelTexture,
     pub sprinkler: PixelTexture,
+    pub rock: PixelTexture,
 }
 
 impl SpritesTiles {
@@ -186,6 +188,7 @@ impl SpritesTiles {
             Tile::Cutter(_) => &self.cutter,
             Tile::Pipe(_) => &self.pipe,
             Tile::Sprinkler(_) => &self.sprinkler,
+            Tile::Rock => &self.rock,
         }
     }
 }

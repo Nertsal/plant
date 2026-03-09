@@ -11,7 +11,8 @@ Config(
         KillBug: 2.5,
     },
 
-    water_frequency: 0.2,
+    rock_frequency: 0.025,
+    water_frequency: 0.08,
     water_lifetime: 10.0,
     poop_lifetime: 10.0,
 
