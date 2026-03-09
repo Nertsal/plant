@@ -404,10 +404,11 @@ impl Model {
         if rng.gen_bool(chance.as_f32().into()) {
             // attempt to spawn
             for _ in 0..5 {
-                let distance = rng.gen_range(7..=15);
-                let x = rng.gen_range(-distance..=distance);
-                let y = ((distance as f32).sqr() - (x as f32).sqr()).sqrt() as ICoord;
-                let pos = vec2(x, y);
+                let bounds = self.grid.bounds;
+                let pos = vec2(
+                    rng.gen_range(bounds.min.x..=bounds.max.x),
+                    rng.gen_range(bounds.min.y..=bounds.max.y),
+                );
                 if self.grid.get_tile(pos).is_none() {
                     self.grid.set_tile(pos, Tile::Rock);
                     break;
@@ -450,7 +451,11 @@ impl Model {
         if rng.gen_bool(chance.as_f32().into()) {
             // attempt to spawn
             for _ in 0..10 {
-                let pos = vec2(rng.gen_range(-10..=10), rng.gen_range(0..10));
+                let bounds = self.grid.bounds;
+                let pos = vec2(
+                    rng.gen_range(bounds.min.x..=bounds.max.x),
+                    rng.gen_range(bounds.min.y..=bounds.max.y),
+                );
                 if self.grid.get_tile(pos).is_none() && !self.grid.is_tile_lit(pos, &self.config) {
                     self.grid.set_tile(
                         pos,

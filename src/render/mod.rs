@@ -42,10 +42,12 @@ impl GameRender {
         let sprites = &assets.sprites;
         let palette = &assets.palette;
 
-        if self.active_highlight.0 != cursor.grid_pos {
+        if Some(self.active_highlight.0) != cursor.grid_pos {
             self.active_highlight.1 -= delta_time / r32(0.25);
-            if self.active_highlight.1 <= Time::ZERO {
-                self.active_highlight.0 = cursor.grid_pos;
+            if self.active_highlight.1 <= Time::ZERO
+                && let Some(grid_pos) = cursor.grid_pos
+            {
+                self.active_highlight.0 = grid_pos;
             }
         } else {
             self.active_highlight.1 += delta_time / r32(0.25);
@@ -67,8 +69,8 @@ impl GameRender {
             });
 
         // Grid
-        for x in -20..20 {
-            for y in -10..30 {
+        for x in model.grid.bounds.min.x..=model.grid.bounds.max.x {
+            for y in model.grid.bounds.min.y..=model.grid.bounds.max.y {
                 let pos = vec2(x, y);
                 let highlight =
                     highlight_range.is_some_and(|(p, r)| logic::manhattan_distance(pos, p) <= r);
@@ -196,20 +198,21 @@ impl GameRender {
         }
 
         // Input state
-        match input_state {
-            InputState::Idle => {
-                let target = cursor.grid_pos;
-                let color = if let Some(tile) = model.grid.get_tile(target)
-                    && let Tile::Bug(_) = tile.tile
-                {
-                    Color::new(0.7, 0.1, 0.1, 0.5)
-                } else {
-                    Color::new(0.7, 0.7, 0.7, 0.5)
-                };
-                tile_highlight(target, color, framebuffer);
-            }
-            InputState::PlaceTile(tile) | InputState::BuyTile(tile) => {
-                ghost_tile(cursor.grid_pos, tile, framebuffer);
+        if let Some(target) = cursor.grid_pos {
+            match input_state {
+                InputState::Idle => {
+                    let color = if let Some(tile) = model.grid.get_tile(target)
+                        && let Tile::Bug(_) = tile.tile
+                    {
+                        Color::new(0.7, 0.1, 0.1, 0.5)
+                    } else {
+                        Color::new(0.7, 0.7, 0.7, 0.5)
+                    };
+                    tile_highlight(target, color, framebuffer);
+                }
+                InputState::PlaceTile(tile) | InputState::BuyTile(tile) => {
+                    ghost_tile(target, tile, framebuffer);
+                }
             }
         }
 

@@ -215,12 +215,14 @@ impl Tile {
 }
 
 pub struct Grid {
+    pub bounds: Aabb2<ICoord>,
     pub tiles: HashMap<vec2<ICoord>, Tile>,
 }
 
 impl Grid {
     pub fn new() -> Self {
         Self {
+            bounds: Aabb2::point(vec2(0, 5)).extend_symmetric(vec2(30, 15)),
             tiles: hashmap! {
                 vec2(0, 0) => Tile::Soil(SoilState::Dry),
                 vec2(0, 9) => Tile::Light(false),
@@ -229,6 +231,13 @@ impl Grid {
                 vec2(-1, 11) => Tile::Power,
             },
         }
+    }
+
+    pub fn in_bounds(&self, pos: vec2<ICoord>) -> bool {
+        self.bounds.min.x <= pos.x
+            && pos.x <= self.bounds.max.x
+            && self.bounds.min.y <= pos.y
+            && pos.y <= self.bounds.max.y
     }
 
     pub fn all_tiles(&self) -> impl Iterator<Item = Positioned<&Tile>> {
@@ -266,10 +275,13 @@ impl Grid {
         pos: vec2<ICoord>,
     ) -> impl Iterator<Item = Positioned<Option<&Tile>>> {
         let offsets = [vec2(-1, 0), vec2(0, -1), vec2(1, 0), vec2(0, 1)];
-        offsets.into_iter().map(move |offset| Positioned {
-            pos: pos + offset,
-            tile: self.get_tile(pos + offset).map(|tile| tile.tile),
-        })
+        offsets
+            .into_iter()
+            .map(move |offset| Positioned {
+                pos: pos + offset,
+                tile: self.get_tile(pos + offset).map(|tile| tile.tile),
+            })
+            .filter(|tile| self.in_bounds(tile.pos))
     }
 
     pub fn get_neighbors(&self, pos: vec2<ICoord>) -> impl Iterator<Item = Positioned<&Tile>> {

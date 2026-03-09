@@ -23,7 +23,7 @@ pub struct GameState {
 pub struct CursorState {
     pub screen_pos: vec2<f64>,
     pub world_pos: vec2<FCoord>,
-    pub grid_pos: vec2<ICoord>,
+    pub grid_pos: Option<vec2<ICoord>>,
 }
 
 #[derive(Debug)]
@@ -43,7 +43,7 @@ impl GameState {
             cursor: CursorState {
                 screen_pos: vec2::ZERO,
                 world_pos: vec2::ZERO,
-                grid_pos: vec2::ZERO,
+                grid_pos: None,
             },
             input_state: InputState::Idle,
             camera_drag: None,
@@ -62,19 +62,20 @@ impl GameState {
             return;
         }
 
-        let target = self.cursor.grid_pos;
-        match &self.input_state {
-            InputState::Idle => {
-                self.model.interact_with(target);
-            }
-            InputState::PlaceTile(tile) => {
-                if self.model.place_tile(target, tile.clone()) {
-                    self.input_state = InputState::Idle;
+        if let Some(target) = self.cursor.grid_pos {
+            match &self.input_state {
+                InputState::Idle => {
+                    self.model.interact_with(target);
                 }
-            }
-            InputState::BuyTile(tile) => {
-                if self.model.buy_tile(target, tile.clone()) {
-                    self.input_state = InputState::Idle;
+                InputState::PlaceTile(tile) => {
+                    if self.model.place_tile(target, tile.clone()) {
+                        self.input_state = InputState::Idle;
+                    }
+                }
+                InputState::BuyTile(tile) => {
+                    if self.model.buy_tile(target, tile.clone()) {
+                        self.input_state = InputState::Idle;
+                    }
                 }
             }
         }
@@ -89,9 +90,9 @@ impl geng::State for GameState {
             // Camera Zoom
             let scroll = self.ui_context.cursor.scroll;
             if scroll.abs() > 0.01 {
-                let sensitivity = 75.0;
+                let sensitivity = 90.0;
                 self.zoom.target -= scroll.signum() * sensitivity * delta_time as f32;
-                self.zoom.target = self.zoom.target.clamp(-5.0, 5.0);
+                self.zoom.target = self.zoom.target.clamp(-5.0, 25.0);
             }
             self.zoom.update(delta_time as f32);
             self.model.camera.fov = Camera2dFov::MinSide(15.0 + self.zoom.current);
@@ -159,7 +160,8 @@ impl geng::State for GameState {
                     .camera
                     .screen_to_world(self.framebuffer_size.as_f32(), position.as_f32())
                     .as_r32();
-                self.cursor.grid_pos = self.model.grid_visual.world_to_grid(self.cursor.world_pos);
+                let grid_pos = self.model.grid_visual.world_to_grid(self.cursor.world_pos);
+                self.cursor.grid_pos = self.model.grid.in_bounds(grid_pos).then_some(grid_pos);
             }
             geng::Event::MousePress {
                 button: geng::MouseButton::Left,
