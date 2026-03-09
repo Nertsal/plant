@@ -106,13 +106,14 @@ pub enum SoilState {
 pub struct Bug {
     pub id: Id,
     pub state: BugState,
+    pub move_timer: Time,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub enum BugState {
     Hungry { hunger: usize, eating_timer: Time },
     Pooping(Time),
-    Chilling(Time),
+    Chilling { time: Time },
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -123,6 +124,7 @@ pub enum Tile {
     Soil(SoilState),
     Water(Time),
     Bug(Bug),
+    Poop,
 }
 
 impl Tile {
@@ -143,13 +145,14 @@ impl Tile {
             },
             Tile::Water(_) => "Water",
             Tile::Bug(_) => "Bug",
+            Tile::Poop => "Poop",
         }
     }
 
     pub fn is_collectable(&self) -> bool {
         matches!(
             self,
-            Tile::Seed(_) | Tile::Light | Tile::Soil(_) | Tile::Water(_)
+            Tile::Seed(_) | Tile::Light | Tile::Soil(_) | Tile::Water(_) | Tile::Poop
         )
     }
 }
@@ -166,6 +169,12 @@ impl Grid {
                 vec2(0, 10) => Tile::Light
             },
         }
+    }
+
+    pub fn all_tiles(&self) -> impl Iterator<Item = Positioned<&Tile>> {
+        self.tiles
+            .iter()
+            .map(|(pos, tile)| Positioned { pos: *pos, tile })
     }
 
     pub fn all_positions(&self) -> impl Iterator<Item = vec2<ICoord>> {
@@ -190,6 +199,17 @@ impl Grid {
         self.tiles
             .insert(pos, tile)
             .map(|tile| Positioned { pos, tile })
+    }
+
+    pub fn get_neighbors_all(
+        &self,
+        pos: vec2<ICoord>,
+    ) -> impl Iterator<Item = Positioned<Option<&Tile>>> {
+        let offsets = [vec2(-1, 0), vec2(0, -1), vec2(1, 0), vec2(0, 1)];
+        offsets.into_iter().map(move |offset| Positioned {
+            pos: pos + offset,
+            tile: self.get_tile(pos + offset).map(|tile| tile.tile),
+        })
     }
 
     pub fn get_neighbors(&self, pos: vec2<ICoord>) -> impl Iterator<Item = Positioned<&Tile>> {

@@ -5,6 +5,8 @@ use super::*;
 
 impl Model {
     pub fn update(&mut self, delta_time: Time) {
+        let mut rng = thread_rng();
+
         self.update_drone(delta_time);
 
         // Update tiles
@@ -61,7 +63,134 @@ impl Model {
                         self.grid.remove_tile(pos);
                     }
                 }
-                Tile::Bug(ref mut bug) => {}
+                Tile::Bug(ref mut bug) => {
+                    if bug.move_timer > Time::ZERO {
+                        bug.move_timer -= delta_time;
+                    }
+                    let can_move = bug.move_timer <= Time::ZERO;
+
+                    let move_towards = |target: vec2<ICoord>, grid: &mut Grid| {
+                        if !can_move {
+                            return;
+                        }
+                        let delta = target - pos;
+                        let dir = if delta.x.abs() >= delta.y.abs() {
+                            vec2(delta.x.signum(), 0)
+                        } else {
+                            vec2(0, delta.y.signum())
+                        };
+
+                        if let Some(mut tile) = grid.remove_tile(pos)
+                            && let Tile::Bug(bug) = &mut tile.tile
+                            && grid.get_tile(tile.pos + dir).is_none()
+                        {
+                            bug.move_timer = self.config.bug_move_time;
+                            grid.set_tile(tile.pos + dir, tile.tile);
+                        }
+                    };
+
+                    match &mut bug.state {
+                        BugState::Hungry { hunger, .. } => {
+                            if *hunger == 0 {
+                                bug.state = BugState::Pooping(self.config.bug_poop_time);
+                                continue;
+                            }
+
+                            // Look for leaves nearby
+                            let leaf_target = self
+                                .grid
+                                .all_tiles()
+                                .filter(|tile| {
+                                    if manhattan_distance(pos, tile.pos) <= 7
+                                        && let Tile::Leaf(leaf) = tile.tile
+                                        && !leaf.root
+                                    {
+                                        true
+                                    } else {
+                                        false
+                                    }
+                                })
+                                .min_by_key(|tile| manhattan_distance(pos, tile.pos))
+                                .map(|tile| tile.pos);
+                            let target = leaf_target
+                                .or_else(|| {
+                                    // Move in available random direction
+                                    self.grid
+                                        .get_neighbors_all(pos)
+                                        .filter(|tile| tile.tile.is_none())
+                                        .map(|tile| tile.pos)
+                                        .choose(&mut rng)
+                                })
+                                .unwrap_or(pos);
+
+                            // Go towards target
+                            if manhattan_distance(pos, target) <= 1
+                                && let Some(tile) = self.grid.get_tile(target)
+                                && let Tile::Leaf(_) = tile.tile
+                            {
+                                // eat
+                                if let Some(bug) = self.grid.get_tile_mut(pos)
+                                    && let Tile::Bug(bug) = bug.tile
+                                    && let BugState::Hungry {
+                                        eating_timer,
+                                        hunger,
+                                    } = &mut bug.state
+                                {
+                                    *eating_timer -= delta_time;
+                                    if *eating_timer <= Time::ZERO {
+                                        *eating_timer = self.config.bug_eat_time;
+                                        *hunger -= 1;
+                                        self.grid.remove_tile(target);
+                                    }
+                                }
+                            } else {
+                                // move
+                                move_towards(target, &mut self.grid);
+                            }
+                        }
+                        BugState::Pooping(timer) => {
+                            *timer -= delta_time;
+                            if *timer <= Time::ZERO {
+                                let target = self
+                                    .grid
+                                    .get_neighbors_all(pos)
+                                    .find(|tile| tile.tile.is_none())
+                                    .map(|tile| tile.pos);
+                                if let Some(target) = target {
+                                    self.grid.set_tile(target, Tile::Poop);
+                                    if let Some(bug) = self.grid.get_tile_mut(pos)
+                                        && let Tile::Bug(bug) = bug.tile
+                                    {
+                                        bug.state = BugState::Chilling {
+                                            time: self.config.bug_chill_time,
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        BugState::Chilling { time } => {
+                            *time -= delta_time;
+                            if *time <= Time::ZERO {
+                                bug.state = BugState::Hungry {
+                                    hunger: self.config.bug_hunger,
+                                    eating_timer: self.config.bug_eat_time,
+                                };
+                            } else {
+                                // Move in available random direction
+                                if let Some(target) = self
+                                    .grid
+                                    .get_neighbors_all(pos)
+                                    .filter(|tile| tile.tile.is_none())
+                                    .map(|tile| tile.pos)
+                                    .choose(&mut rng)
+                                {
+                                    move_towards(target, &mut self.grid);
+                                }
+                            }
+                        }
+                    }
+                }
+                Tile::Poop => {}
             }
         }
 
@@ -106,8 +235,9 @@ impl Model {
                         id: self.next_id,
                         state: BugState::Hungry {
                             hunger: self.config.bug_hunger,
-                            eating_timer: self.config.bug_eat_timer,
+                            eating_timer: self.config.bug_eat_time,
                         },
+                        move_timer: self.config.bug_move_time,
                     }),
                 );
                 self.next_id += 1;
@@ -286,4 +416,12 @@ fn get_all_connected(
     }
 
     connected
+}
+
+pub fn aabb_contains(aabb: Aabb2<ICoord>, pos: vec2<ICoord>) -> bool {
+    aabb.min.x <= pos.x && aabb.min.y <= pos.y && aabb.max.x >= pos.x && aabb.max.y >= pos.y
+}
+
+pub fn manhattan_distance(a: vec2<ICoord>, b: vec2<ICoord>) -> ICoord {
+    (a.x - b.x).abs() + (a.y - b.y).abs()
 }

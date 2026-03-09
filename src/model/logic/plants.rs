@@ -74,14 +74,6 @@ impl Model {
     }
 }
 
-pub fn aabb_contains(aabb: Aabb2<ICoord>, pos: vec2<ICoord>) -> bool {
-    aabb.min.x <= pos.x && aabb.min.y <= pos.y && aabb.max.x >= pos.x && aabb.max.y >= pos.y
-}
-
-pub fn manhattan_distance(a: vec2<ICoord>, b: vec2<ICoord>) -> ICoord {
-    (a.x - b.x).abs() + (a.y - b.y).abs()
-}
-
 pub fn can_grow_into(pos: vec2<ICoord>, grid: &Grid) -> bool {
     grid.get_tile(pos).is_none()
 }

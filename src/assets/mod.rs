@@ -16,7 +16,8 @@ pub struct Config {
     pub water_lifetime: Time,
     pub bug_frequency: R32,
     pub bug_hunger: usize,
-    pub bug_eat_timer: Time,
+    pub bug_eat_time: Time,
+    pub bug_poop_time: Time,
     pub bug_chill_time: Time,
     pub bug_move_time: Time,
     pub shop: Vec<ConfigShopItem>,
@@ -118,6 +119,7 @@ pub struct SpritesTiles {
     // pub soil_rich: PixelTexture,
     pub water: PixelTexture,
     pub bug: PixelTexture,
+    pub poop: PixelTexture,
 }
 
 impl SpritesTiles {
@@ -138,6 +140,7 @@ impl SpritesTiles {
             },
             Tile::Water(_) => &self.water,
             Tile::Bug(_) => &self.bug,
+            Tile::Poop => &self.poop,
         }
     }
 }
