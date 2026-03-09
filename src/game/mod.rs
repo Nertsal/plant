@@ -2,7 +2,7 @@ mod ui;
 
 pub use self::ui::*;
 
-use crate::{model::*, prelude::*, render::*, ui::context::UiContext};
+use crate::{model::*, prelude::*, render::*, ui::context::UiContext, util::SecondOrderState};
 
 pub struct GameState {
     context: Context,
@@ -16,6 +16,8 @@ pub struct GameState {
 
     cursor: CursorState,
     input_state: InputState,
+    camera_drag: Option<(vec2<f32>, vec2<f64>)>,
+    zoom: SecondOrderState<f32>,
 }
 
 pub struct CursorState {
@@ -44,6 +46,8 @@ impl GameState {
                 grid_pos: vec2::ZERO,
             },
             input_state: InputState::Idle,
+            camera_drag: None,
+            zoom: SecondOrderState::new(3.0, 1.0, 0.0, 0.0),
 
             ui_context: UiContext::new(context.clone()),
             framebuffer_size: vec2(1, 1),
@@ -80,6 +84,29 @@ impl GameState {
 impl geng::State for GameState {
     fn update(&mut self, delta_time: f64) {
         self.ui_context.update(delta_time as f32);
+
+        {
+            // Camera Zoom
+            let scroll = self.ui_context.cursor.scroll;
+            if scroll.abs() > 0.01 {
+                let sensitivity = 75.0;
+                self.zoom.target -= scroll.signum() * sensitivity * delta_time as f32;
+                self.zoom.target = self.zoom.target.clamp(-5.0, 5.0);
+            }
+            self.zoom.update(delta_time as f32);
+            self.model.camera.fov = Camera2dFov::MinSide(15.0 + self.zoom.current);
+        }
+        if let Some(drag) = self.camera_drag {
+            let from = self
+                .model
+                .camera
+                .screen_to_world(self.framebuffer_size.as_f32(), drag.1.as_f32());
+            let to = self.model.camera.screen_to_world(
+                self.framebuffer_size.as_f32(),
+                self.cursor.screen_pos.as_f32(),
+            );
+            self.model.camera.center = drag.0 + from - to;
+        }
 
         let delta_time = Time::new(delta_time as f32);
         self.delta_time = delta_time;
@@ -138,6 +165,16 @@ impl geng::State for GameState {
                 button: geng::MouseButton::Left,
             } => {
                 self.left_click();
+            }
+            geng::Event::MousePress {
+                button: geng::MouseButton::Middle | geng::MouseButton::Right,
+            } => {
+                self.camera_drag = Some((self.model.camera.center, self.cursor.screen_pos));
+            }
+            geng::Event::MouseRelease {
+                button: geng::MouseButton::Middle | geng::MouseButton::Right,
+            } => {
+                self.camera_drag = None;
             }
             _ => {}
         }
