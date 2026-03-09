@@ -361,7 +361,9 @@ impl Model {
             if lost_plants.contains(&tile.pos) {
                 continue;
             }
-            if let Tile::Leaf(leaf) = tile.tile {
+            if let Tile::Leaf(leaf) = tile.tile
+                && !leaf.root
+            {
                 // Check connectivity to root
                 let mut rooted = false;
                 let group = get_all_connected(&self.grid, tile.pos, |other| {
