@@ -120,11 +120,13 @@ pub enum BugState {
 pub enum Tile {
     Seed(PlantKind),
     Leaf(Leaf),
-    Light,
+    Light(bool),
     Soil(SoilState),
     Water(Time),
     Bug(Bug),
     Poop,
+    Power,
+    Wire(bool),
 }
 
 impl Tile {
@@ -138,7 +140,7 @@ impl Tile {
                 PlantKind::TypeA => "Leaf (A)",
                 PlantKind::TypeB => "Leaf (B)",
             },
-            Tile::Light => "Light",
+            Tile::Light(_) => "Light",
             Tile::Soil(state) => match state {
                 SoilState::Dry => "Dry Soil",
                 SoilState::Watered => "Soil",
@@ -146,14 +148,26 @@ impl Tile {
             Tile::Water(_) => "Water",
             Tile::Bug(_) => "Bug",
             Tile::Poop => "Poop",
+            Tile::Power => "Power",
+            Tile::Wire(_) => "Wire",
         }
     }
 
     pub fn is_collectable(&self) -> bool {
         matches!(
             self,
-            Tile::Seed(_) | Tile::Light | Tile::Soil(_) | Tile::Water(_) | Tile::Poop
+            Tile::Seed(_)
+                | Tile::Light(_)
+                | Tile::Soil(_)
+                | Tile::Water(_)
+                | Tile::Poop
+                | Tile::Power
+                | Tile::Wire(_)
         )
+    }
+
+    pub fn transmits_power(&self) -> bool {
+        matches!(self, Tile::Power | Tile::Wire(_) | Tile::Light(_))
     }
 }
 
@@ -166,7 +180,10 @@ impl Grid {
         Self {
             tiles: hashmap! {
                 vec2(0, 0) => Tile::Soil(SoilState::Dry),
-                vec2(0, 10) => Tile::Light
+                vec2(0, 9) => Tile::Light(false),
+                vec2(0, 10) => Tile::Wire(false),
+                vec2(0, 11) => Tile::Wire(false),
+                vec2(-1, 11) => Tile::Power,
             },
         }
     }

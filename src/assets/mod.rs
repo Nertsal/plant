@@ -120,6 +120,8 @@ pub struct SpritesTiles {
     pub water: PixelTexture,
     pub bug: PixelTexture,
     pub poop: PixelTexture,
+    pub power: PixelTexture,
+    pub wire: PixelTexture,
 }
 
 impl SpritesTiles {
@@ -133,7 +135,7 @@ impl SpritesTiles {
                 PlantKind::TypeA => &self.seed_a,
                 PlantKind::TypeB => &self.seed_b,
             },
-            Tile::Light => &self.light,
+            Tile::Light(_) => &self.light,
             Tile::Soil(state) => match state {
                 SoilState::Dry => &self.soil_dry,
                 SoilState::Watered => &self.soil,
@@ -141,6 +143,8 @@ impl SpritesTiles {
             Tile::Water(_) => &self.water,
             Tile::Bug(_) => &self.bug,
             Tile::Poop => &self.poop,
+            Tile::Power => &self.power,
+            Tile::Wire(_) => &self.wire,
         }
     }
 }

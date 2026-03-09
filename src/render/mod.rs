@@ -60,8 +60,25 @@ impl GameRender {
                 continue;
             };
             let texture = sprites.tiles.get_texture(tile.tile);
-            self.util
-                .draw_on_tile(&model.grid_visual, pos, texture, &model.camera, framebuffer);
+            let mult = match *tile.tile {
+                Tile::Light(power) | Tile::Wire(power) => {
+                    if power {
+                        1.0
+                    } else {
+                        0.5
+                    }
+                }
+                _ => 1.0,
+            };
+            let color = Color::new(mult, mult, mult, 1.0);
+            self.util.draw_on_tile_with(
+                &model.grid_visual,
+                pos,
+                color,
+                texture,
+                &model.camera,
+                framebuffer,
+            );
         }
 
         let tile_highlight = |pos: vec2<ICoord>,

@@ -17,7 +17,21 @@ impl Model {
             };
             match *tile.tile {
                 Tile::Leaf(_) => self.update_plant(pos, delta_time),
-                Tile::Light => {}
+                Tile::Power => {}
+                Tile::Light(_) | Tile::Wire(_) => {
+                    let mut powered = false;
+                    get_all_connected(&self.grid, pos, |tile| {
+                        if let Tile::Power = tile.tile {
+                            powered = true;
+                        }
+                        tile.tile.transmits_power()
+                    });
+                    if let Some(tile) = self.grid.get_tile_mut(pos)
+                        && let Tile::Light(power) | Tile::Wire(power) = tile.tile
+                    {
+                        *power = powered;
+                    }
+                }
                 Tile::Seed(plant_kind) => {
                     let soil = self
                         .grid
