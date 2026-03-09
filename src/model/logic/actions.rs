@@ -74,7 +74,7 @@ impl Model {
 
         // Earn money
         let size = plant_positions.len();
-        self.money += size as Money;
+        self.money += size as Money * self.config.plants[&leaf.kind].price;
 
         // Remove stem and leaves
         for pos in plant_positions {
