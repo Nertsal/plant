@@ -95,10 +95,11 @@ impl Model {
             .filter(|tile| matches!(tile.tile, Tile::Light(true)))
             .map(|tile| tile.pos)
             .collect();
-        let options: Vec<_> = [vec2(-1, 0), vec2(0, 1), vec2(1, 0), vec2(0, -1)]
-            .iter()
-            .copied()
-            .map(|delta| plant.pos + delta)
+
+        let options: Vec<_> = self
+            .grid
+            .get_neighbors_all(plant.pos)
+            .filter_map(|tile| tile.tile.is_none().then_some(tile.pos))
             .filter(|&pos| can_grow_into(pos, &self.grid))
             .map(|pos| {
                 let light_d = lights

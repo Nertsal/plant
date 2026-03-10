@@ -439,7 +439,7 @@ impl Model {
                 if let Some(&anchor) = anchors.choose(&mut rng) {
                     let offset = vec2(rng.gen_range(-2..=2), rng.gen_range(-2..=2));
                     let target = anchor + offset;
-                    if self.grid.get_tile(target).is_none() {
+                    if self.grid.in_bounds(target) && self.grid.get_tile(target).is_none() {
                         self.grid
                             .set_tile(target, Tile::Water(self.config.water_lifetime));
                         break;
