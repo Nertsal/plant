@@ -52,7 +52,7 @@ impl GameRender {
         {
             self.hover_animation.push((selected, Time::ZERO));
         }
-        let animation_time = r32(0.15);
+        let animation_time = r32(0.5);
         for (_, time) in &mut self.hover_animation {
             *time += delta_time / animation_time;
             *time = (*time).clamp(Time::ZERO, Time::ONE);
@@ -139,15 +139,9 @@ impl GameRender {
             let mut transform = mat3::identity();
             if let Some((_, t)) = self.hover_animation.iter().find(|(p, _)| *p == pos) {
                 let t = t.as_f32();
-                let m = 0.7;
-                let t = if t < m {
-                    t / m
-                } else {
-                    1.0 - (t - m) / (1.0 - m)
-                };
-                let t = crate::util::smoothstep(t);
-                let stretch = 1.0 + t * 0.1;
-                let squish = 1.0 - t * 0.15;
+                let t = 1.0 - crate::util::ease_out_elastic_with(t, 3.0, 1.0);
+                let stretch = 1.0 + t * 0.3;
+                let squish = 1.0 - t * 0.3;
                 transform *= mat3::scale(vec2(squish, stretch));
             }
             self.util.draw_on_tile_with(
