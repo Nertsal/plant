@@ -119,6 +119,8 @@ pub struct Palette {
     pub background: Color,
     pub text: Color,
     pub gold: Color,
+    pub progress_background: Color,
+    pub progress: Color,
 }
 
 #[derive(geng::asset::Load)]

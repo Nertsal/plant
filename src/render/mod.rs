@@ -42,6 +42,8 @@ impl GameRender {
         let sprites = &assets.sprites;
         let palette = &assets.palette;
 
+        let pixel_scale = model.grid_visual.tile_size.y.as_f32() / TILE_SIZE_PIXELS.y as f32;
+
         if Some(self.active_highlight.0) != cursor.grid_pos {
             self.active_highlight.1 -= delta_time / r32(0.25);
             if self.active_highlight.1 <= Time::ZERO
@@ -188,7 +190,7 @@ impl GameRender {
                 pos,
                 Color::new(1.0, 1.0, 1.0, 0.8),
                 &sprites.ui_window,
-                model.grid_visual.tile_size.y.as_f32() / TILE_SIZE_PIXELS.y as f32,
+                pixel_scale,
                 &model.camera,
                 framebuffer,
             );
@@ -278,6 +280,23 @@ impl GameRender {
             &model.camera,
             framebuffer,
         );
+        if model.drone.action_progress > R32::ZERO {
+            // Drone progress
+            let t = model.drone.action_progress.as_f32();
+            let pos = Aabb2::point(model.drone.position.as_f32() + vec2(0.0, -10.0) * pixel_scale)
+                .extend_symmetric(vec2(8.0, 2.0) * pixel_scale);
+            self.context.geng.draw2d().quad(
+                framebuffer,
+                &model.camera,
+                pos,
+                palette.progress_background,
+            );
+            let pos = pos.extend_uniform(-pixel_scale).split_left(t);
+            self.context
+                .geng
+                .draw2d()
+                .quad(framebuffer, &model.camera, pos, palette.progress);
+        }
     }
 
     pub fn draw_ui(&mut self, ui: &GameUI, model: &Model, framebuffer: &mut ugli::Framebuffer) {

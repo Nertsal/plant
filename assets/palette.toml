@@ -1,3 +1,5 @@
 background = "#31315B"
 text = "#F2FBF4"
 gold = "#F1D605"
+progress_background = "#212545"
+progress = "#F2FBF4"
