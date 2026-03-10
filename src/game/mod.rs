@@ -109,8 +109,19 @@ impl geng::State for GameState {
             self.model.camera.center = drag.0 + from - to;
         }
 
-        let delta_time = Time::new(delta_time as f32);
+        let mut delta_time = Time::new(delta_time as f32);
         self.delta_time = delta_time;
+
+        if cfg!(feature = "cheats")
+            && self.context.geng.window().is_key_pressed(geng::Key::T)
+            && self
+                .context
+                .geng
+                .window()
+                .is_key_pressed(geng::Key::ShiftLeft)
+        {
+            delta_time *= r32(20.0);
+        }
         self.model.update(delta_time);
 
         // UI events
