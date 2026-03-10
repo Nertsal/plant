@@ -8,6 +8,8 @@ pub type Time = R32;
 pub type Money = i32;
 pub type Id = usize;
 
+pub const INVENTORY_MAX_SIZE: usize = 10;
+
 pub struct Model {
     pub context: Context,
     pub camera: Camera2d,

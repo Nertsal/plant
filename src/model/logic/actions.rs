@@ -12,7 +12,17 @@ impl Model {
         self.drone.target = match &tile.tile {
             Tile::Leaf(_) => DroneTarget::Interact(target, DroneAction::CutPlant),
             Tile::Bug(bug) => DroneTarget::KillBug(bug.id),
-            _ if tile.tile.is_collectable() => DroneTarget::Interact(target, DroneAction::Collect),
+            _ if tile.tile.is_collectable() => {
+                if self.inventory.len() >= INVENTORY_MAX_SIZE {
+                    // Inventory already maxed
+                    // self.context
+                    //     .sfx
+                    //     .play(&self.context.assets.sounds.drone_deny);
+                    self.drone.target = DroneTarget::MoveTo(target);
+                    return;
+                }
+                DroneTarget::Interact(target, DroneAction::Collect)
+            }
             _ => DroneTarget::MoveTo(target),
         };
         self.context
@@ -93,6 +103,11 @@ impl Model {
     }
 
     pub fn collect(&mut self, target: vec2<ICoord>) {
+        if self.inventory.len() >= INVENTORY_MAX_SIZE {
+            // Inventory already maxed
+            return;
+        }
+
         let Some(tile) = self.grid.get_tile(target) else {
             return;
         };

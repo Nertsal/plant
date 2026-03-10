@@ -202,6 +202,7 @@ impl geng::State for GameState {
         );
 
         self.ui.layout(
+            &self.model,
             Aabb2::ZERO.extend_positive(framebuffer.size().as_f32()),
             &mut self.ui_context,
         );
