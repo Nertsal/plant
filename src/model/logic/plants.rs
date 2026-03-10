@@ -5,17 +5,52 @@ const SPLIT_CHANCE: f32 = 0.1;
 impl Model {
     pub fn update_plant(&mut self, position: vec2<ICoord>, delta_time: Time) {
         let is_lit = self.grid.is_tile_lit(position, &self.config);
-        let Some(mut plant) = self.grid.get_tile_mut(position) else {
-            return;
-        };
-        let Tile::Leaf(leaf) = &mut plant.tile else {
-            return;
-        };
+
+        macro_rules! let_leaf {
+            (let $plant:ident, $leaf:ident) => {
+                let Some($plant) = self.grid.get_tile(position) else {
+                    return;
+                };
+                let Tile::Leaf($leaf) = &$plant.tile else {
+                    return;
+                };
+            };
+            (let mut $plant:ident, $leaf:ident) => {
+                let Some(mut $plant) = self.grid.get_tile_mut(position) else {
+                    return;
+                };
+                let Tile::Leaf($leaf) = &mut $plant.tile else {
+                    return;
+                };
+            };
+        }
+
+        // Update connections
+        let_leaf!(let plant, leaf);
+        let mut connections = leaf.connections.clone();
+        for delta in Connections::NEIGHBORS {
+            if connections.get(delta).is_some()
+                && self
+                    .grid
+                    .get_tile(position + delta)
+                    .is_none_or(|tile| !matches!(tile.tile, Tile::Leaf(_)))
+            {
+                // Connection dropped
+                connections.set(delta, None);
+            }
+        }
+        let connect_count = connections.get_connections(position).count();
 
         let mut rng = thread_rng();
         let plant_config = &self.config.plants[&leaf.kind];
 
         // Update growth timer
+        let_leaf!(let mut plant, leaf);
+        if leaf.growth_timer.is_none() && (connect_count == 0 || (!leaf.root && connect_count <= 1))
+        {
+            leaf.growth_timer = Some(R32::ONE);
+        }
+
         let mut grow = false;
         if let Some(timer) = &mut leaf.growth_timer {
             let growth_time = if is_lit {
@@ -36,12 +71,7 @@ impl Model {
         }
 
         // Grow
-        let Some(plant) = self.grid.get_tile(position) else {
-            return;
-        };
-        let Tile::Leaf(leaf) = &plant.tile else {
-            return;
-        };
+        let_leaf!(let plant, leaf);
         if get_all_connected(&self.grid, plant.pos, |tile| {
             if let Tile::Leaf(other) = tile.tile
                 && leaf.kind == other.kind
@@ -113,11 +143,24 @@ impl Model {
         // Spawn new plants
         let kind = leaf.kind;
         if let Some(grow) = grow_left {
-            self.grid.set_tile(grow, Tile::Leaf(Leaf::new(kind)));
+            let mut leaf = Leaf::new(kind);
+            leaf.connections.set(position - grow, Some(()));
+            self.grid.set_tile(grow, Tile::Leaf(leaf));
             self.context.sfx.play(&self.context.assets.sounds.grow);
         }
         if let Some(grow) = grow_right {
-            self.grid.set_tile(grow, Tile::Leaf(Leaf::new(kind)));
+            let mut leaf = Leaf::new(kind);
+            leaf.connections.set(position - grow, Some(()));
+            self.grid.set_tile(grow, Tile::Leaf(leaf));
+        }
+
+        // Connect
+        let_leaf!(let mut plant, leaf);
+        if let Some(grow) = grow_left {
+            leaf.connections.set(grow - position, Some(()));
+        }
+        if let Some(grow) = grow_right {
+            leaf.connections.set(grow - position, Some(()));
         }
     }
 }

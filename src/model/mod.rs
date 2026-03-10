@@ -65,11 +65,94 @@ pub enum PlantKind {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct Connections<T = ()> {
+    pub left: Option<T>,
+    pub right: Option<T>,
+    pub down: Option<T>,
+    pub up: Option<T>,
+}
+
+impl Connections {
+    pub const NEIGHBORS: [vec2<ICoord>; 4] = [vec2(-1, 0), vec2(0, -1), vec2(1, 0), vec2(0, 1)];
+}
+
+impl<T> Connections<T> {
+    pub fn new() -> Self {
+        Self {
+            left: None,
+            right: None,
+            down: None,
+            up: None,
+        }
+    }
+
+    pub fn get(&self, delta: vec2<ICoord>) -> Option<&T> {
+        match delta {
+            vec2(-1, 0) => self.left.as_ref(),
+            vec2(0, -1) => self.down.as_ref(),
+            vec2(1, 0) => self.right.as_ref(),
+            vec2(0, 1) => self.up.as_ref(),
+            _ => None,
+        }
+    }
+
+    pub fn get_mut(&mut self, delta: vec2<ICoord>) -> Option<&mut T> {
+        match delta {
+            vec2(-1, 0) => self.left.as_mut(),
+            vec2(0, -1) => self.down.as_mut(),
+            vec2(1, 0) => self.right.as_mut(),
+            vec2(0, 1) => self.up.as_mut(),
+            _ => None,
+        }
+    }
+
+    pub fn set(&mut self, delta: vec2<ICoord>, value: Option<T>) -> Option<T> {
+        match delta {
+            vec2(-1, 0) => std::mem::replace(&mut self.left, value),
+            vec2(0, -1) => std::mem::replace(&mut self.down, value),
+            vec2(1, 0) => std::mem::replace(&mut self.right, value),
+            vec2(0, 1) => std::mem::replace(&mut self.up, value),
+            _ => None,
+        }
+    }
+
+    pub fn get_all(&self, position: vec2<ICoord>) -> [Positioned<Option<&T>>; 4] {
+        fn mk<T>(
+            position: vec2<ICoord>,
+            dx: ICoord,
+            dy: ICoord,
+            item: Option<&T>,
+        ) -> Positioned<Option<&T>> {
+            Positioned {
+                pos: position + vec2(dx, dy),
+                tile: item,
+            }
+        }
+        [
+            mk(position, -1, 0, self.left.as_ref()),
+            mk(position, 0, -1, self.down.as_ref()),
+            mk(position, 1, 0, self.right.as_ref()),
+            mk(position, 0, 1, self.up.as_ref()),
+        ]
+    }
+
+    pub fn get_connections(&self, position: vec2<ICoord>) -> impl Iterator<Item = Positioned<&T>> {
+        self.get_all(position).into_iter().filter_map(|neighbor| {
+            neighbor.tile.map(|tile| Positioned {
+                pos: neighbor.pos,
+                tile,
+            })
+        })
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct Leaf {
     /// Time until the plant attempts to grow.
     pub growth_timer: Option<Time>,
     pub root: bool,
     pub kind: PlantKind,
+    pub connections: Connections,
 }
 
 impl Leaf {
@@ -78,11 +161,17 @@ impl Leaf {
             growth_timer: Some(R32::ONE),
             root: false,
             kind,
+            connections: Connections::new(),
         }
     }
 
     pub fn root(self) -> Self {
         Self { root: true, ..self }
+    }
+
+    pub fn connected(mut self, side: vec2<ICoord>) -> Self {
+        self.connections.set(side, Some(()));
+        self
     }
 }
 
@@ -331,8 +420,10 @@ impl Grid {
     }
 
     pub fn is_tile_lit(&self, pos: vec2<ICoord>, config: &Config) -> bool {
-        self.all_tiles()
-            .any(|light| logic::manhattan_distance(pos, light.pos) <= config.light_radius)
+        self.all_tiles().any(|light| {
+            matches!(light.tile, Tile::Light(_))
+                && logic::manhattan_distance(pos, light.pos) <= config.light_radius
+        })
     }
 }
 
