@@ -149,6 +149,16 @@ impl geng::State for GameState {
 
     fn handle_event(&mut self, event: geng::Event) {
         match event {
+            #[cfg(feature = "cheats")]
+            geng::Event::KeyPress { key: geng::Key::G }
+                if self
+                    .context
+                    .geng
+                    .window()
+                    .is_key_pressed(geng::Key::ShiftLeft) =>
+            {
+                self.model.money += 10000;
+            }
             geng::Event::Wheel { delta } => {
                 self.ui_context.cursor.scroll += delta as f32;
             }

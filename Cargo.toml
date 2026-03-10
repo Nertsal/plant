@@ -3,6 +3,9 @@ name = "plant"
 version = "0.1.0"
 edition = "2024"
 
+[features]
+cheats = []
+
 [dependencies]
 async-compat = "0.2.4"
 async-executor = "1.13.1"
