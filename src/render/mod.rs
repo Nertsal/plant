@@ -96,7 +96,7 @@ impl GameRender {
 
         // Tiles
         let mut positions: Vec<_> = model.grid.all_positions().collect();
-        positions.sort_by_key(|pos| -pos.y);
+        positions.sort_by_key(|pos| (-pos.y, pos.x));
         for pos in positions {
             let Some(tile) = model.grid.get_tile(pos) else {
                 continue;
@@ -118,6 +118,7 @@ impl GameRender {
                 }
                 _ => 1.0,
             };
+
             let color = Color::new(mult, mult, mult, 1.0);
             self.util.draw_on_tile_with(
                 &model.grid_visual,
@@ -148,6 +149,55 @@ impl GameRender {
                     .draw2d()
                     .quad(framebuffer, &model.camera, pos, palette.progress);
             }
+        }
+
+        // Tile Connections
+        // TODO: draw connections before tiles, but separate the shadows
+        let mut connections: HashMap<(vec2<ICoord>, vec2<ICoord>), Color> = HashMap::new();
+        let mut add_connection = |a: vec2<ICoord>, b: vec2<ICoord>, color: Color| {
+            let a = (a.x, a.y);
+            let b = (b.x, b.y);
+            let (a, b) = min_max(a, b);
+            let a = vec2(a.0, a.1);
+            let b = vec2(b.0, b.1);
+            connections.insert((a, b), color);
+        };
+        for tile in model.grid.all_tiles() {
+            match tile.tile {
+                Tile::Leaf(leaf) => {
+                    for connected_to in leaf.connections.get_connections(tile.pos) {
+                        add_connection(tile.pos, connected_to.pos, palette.connection_plant);
+                    }
+                }
+                _ if tile.tile.transmits_power() => {
+                    for neighbor in model.grid.get_neighbors(tile.pos) {
+                        if neighbor.tile.transmits_power() {
+                            add_connection(tile.pos, neighbor.pos, palette.connection_power);
+                        }
+                    }
+                }
+                _ => {}
+            }
+        }
+        for ((a, b), color) in connections {
+            let mut pos = model
+                .grid_visual
+                .multitile_bounds(Aabb2::from_corners(a, b))
+                .center();
+            let texture = if a.x == b.x {
+                pos += (vec2(0.0, 1.5) * pixel_scale).as_r32();
+                &sprites.tile_connector_vertical
+            } else {
+                &sprites.tile_connector_horizontal
+            };
+            self.util.draw_texture_autoscaled(
+                pos,
+                Angle::ZERO,
+                color,
+                texture,
+                &model.camera,
+                framebuffer,
+            );
         }
 
         let tile_highlight = |pos: vec2<ICoord>,
@@ -297,6 +347,7 @@ impl GameRender {
         self.util.draw_texture_autoscaled(
             model.drone.position,
             angle.as_f32(),
+            Color::WHITE,
             &sprites.drone,
             &model.camera,
             framebuffer,

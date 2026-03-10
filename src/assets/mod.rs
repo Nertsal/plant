@@ -121,6 +121,8 @@ pub struct Palette {
     pub gold: Color,
     pub progress_background: Color,
     pub progress: Color,
+    pub connection_plant: Color,
+    pub connection_power: Color,
 }
 
 #[derive(geng::asset::Load)]
@@ -129,6 +131,8 @@ pub struct Sprites {
     pub tile_select: PixelTexture,
     pub tile: PixelTexture,
     pub tiles: SpritesTiles,
+    pub tile_connector_horizontal: PixelTexture,
+    pub tile_connector_vertical: PixelTexture,
 
     pub ui_window: PixelTexture,
     // pub ui_window_shop: PixelTexture,

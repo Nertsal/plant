@@ -186,6 +186,7 @@ impl UtilRender {
         &self,
         pos: vec2<FCoord>,
         angle: Angle,
+        color: Color,
         texture: &ugli::Texture,
         camera: &impl geng::AbstractCamera2d,
         framebuffer: &mut ugli::Framebuffer,
@@ -195,7 +196,7 @@ impl UtilRender {
         self.context.geng.draw2d().draw2d(
             framebuffer,
             camera,
-            &draw2d::TexturedQuad::new(quad, texture)
+            &draw2d::TexturedQuad::colored(quad, texture, color)
                 .transform(mat3::translate(pos.as_f32()) * mat3::rotate(angle)),
         );
     }
