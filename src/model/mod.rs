@@ -235,6 +235,7 @@ impl Tile {
                 | Tile::Cutter(_)
                 | Tile::Sprinkler(_)
                 | Tile::Rock
+                | Tile::Drainer
         )
     }
 
