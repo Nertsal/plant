@@ -9,6 +9,7 @@ pub struct GameState {
     ui_context: UiContext,
     framebuffer_size: vec2<usize>,
     delta_time: Time,
+    real_time: Time,
 
     render: GameRender,
     model: Model,
@@ -16,8 +17,14 @@ pub struct GameState {
 
     cursor: CursorState,
     input_state: InputState,
-    camera_drag: Option<(vec2<f32>, vec2<f64>)>,
+    camera_drag: Option<Drag>,
     zoom: SecondOrderState<f32>,
+}
+
+pub struct Drag {
+    pub from_world: vec2<FCoord>,
+    pub from_screen: vec2<f64>,
+    pub from_real_time: Time,
 }
 
 pub struct CursorState {
@@ -52,6 +59,7 @@ impl GameState {
             ui_context: UiContext::new(context.clone()),
             framebuffer_size: vec2(1, 1),
             delta_time: Time::new(0.1),
+            real_time: Time::ZERO,
             context,
         }
     }
@@ -97,20 +105,21 @@ impl geng::State for GameState {
             self.zoom.update(delta_time as f32);
             self.model.camera.fov = Camera2dFov::MinSide(15.0 + self.zoom.current);
         }
-        if let Some(drag) = self.camera_drag {
+        if let Some(drag) = &self.camera_drag {
             let from = self
                 .model
                 .camera
-                .screen_to_world(self.framebuffer_size.as_f32(), drag.1.as_f32());
+                .screen_to_world(self.framebuffer_size.as_f32(), drag.from_screen.as_f32());
             let to = self.model.camera.screen_to_world(
                 self.framebuffer_size.as_f32(),
                 self.cursor.screen_pos.as_f32(),
             );
-            self.model.camera.center = drag.0 + from - to;
+            self.model.camera.center = drag.from_world.as_f32() + from - to;
         }
 
         let mut delta_time = Time::new(delta_time as f32);
         self.delta_time = delta_time;
+        self.real_time += delta_time;
 
         if cfg!(feature = "cheats")
             && self.context.geng.window().is_key_pressed(geng::Key::T)
@@ -192,12 +201,26 @@ impl geng::State for GameState {
             geng::Event::MousePress {
                 button: geng::MouseButton::Middle | geng::MouseButton::Right,
             } => {
-                self.camera_drag = Some((self.model.camera.center, self.cursor.screen_pos));
+                self.camera_drag = Some(Drag {
+                    from_world: self.model.camera.center.as_r32(),
+                    from_screen: self.cursor.screen_pos,
+                    from_real_time: self.real_time,
+                });
             }
-            geng::Event::MouseRelease {
-                button: geng::MouseButton::Middle | geng::MouseButton::Right,
-            } => {
-                self.camera_drag = None;
+            geng::Event::MouseRelease { button } => {
+                if let geng::MouseButton::Right | geng::MouseButton::Middle = button
+                    && let Some(drag) = self.camera_drag.take() // Stop dragging camera
+                    && let geng::MouseButton::Right = button
+                    && (self.cursor.screen_pos - drag.from_screen).len_sqr() < 0.1
+                    && (self.real_time - drag.from_real_time).as_f32() < 0.5
+                {
+                    // Stop drone action on short right click
+                    self.model.drone.target = DroneTarget::MoveTo(
+                        self.model
+                            .grid_visual
+                            .world_to_grid(self.model.drone.position),
+                    );
+                }
             }
             _ => {}
         }
