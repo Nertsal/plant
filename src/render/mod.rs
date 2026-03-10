@@ -18,6 +18,7 @@ pub struct GameRender {
     pub util: UtilRender,
     pub ui: UiRender,
     pub active_highlight: (vec2<ICoord>, Time),
+    pub hover_animation: Vec<(vec2<ICoord>, Time)>,
 }
 
 impl GameRender {
@@ -26,6 +27,7 @@ impl GameRender {
             util: UtilRender::new(context.clone()),
             ui: UiRender::new(context.clone()),
             active_highlight: (vec2::ZERO, Time::ZERO),
+            hover_animation: Vec::new(),
             context,
         }
     }
@@ -43,6 +45,20 @@ impl GameRender {
         let palette = &assets.palette;
 
         let pixel_scale = model.grid_visual.tile_size.y.as_f32() / TILE_SIZE_PIXELS.y as f32;
+
+        if let Some(selected) = cursor.grid_pos
+            && model.grid.get_tile(selected).is_some()
+            && !self.hover_animation.iter().any(|(p, _)| *p == selected)
+        {
+            self.hover_animation.push((selected, Time::ZERO));
+        }
+        let animation_time = r32(0.25);
+        for (_, time) in &mut self.hover_animation {
+            *time += delta_time / animation_time;
+            *time = (*time).clamp(Time::ZERO, Time::ONE);
+        }
+        self.hover_animation
+            .retain(|(p, time)| *time < Time::ONE || Some(*p) == cursor.grid_pos);
 
         if Some(self.active_highlight.0) != cursor.grid_pos {
             self.active_highlight.1 -= delta_time / r32(0.25);
@@ -83,7 +99,7 @@ impl GameRender {
                 } else {
                     Color::WHITE
                 };
-                self.util.draw_on_tile_with(
+                self.util.draw_on_tile(
                     &model.grid_visual,
                     pos,
                     color,
@@ -120,10 +136,19 @@ impl GameRender {
             };
 
             let color = Color::new(mult, mult, mult, 1.0);
+            let mut transform = mat3::identity();
+            if let Some((_, t)) = self.hover_animation.iter().find(|(p, _)| *p == pos) {
+                let t = crate::util::smoothstep(t.as_f32());
+                let t = (1.0 - t).abs();
+                let stretch = 1.0 + t * 0.15;
+                let squish = 1.0 - t * 0.15;
+                transform *= mat3::scale(vec2(squish, stretch));
+            }
             self.util.draw_on_tile_with(
                 &model.grid_visual,
                 pos,
                 color,
+                transform,
                 texture,
                 &model.camera,
                 framebuffer,
@@ -203,7 +228,7 @@ impl GameRender {
         let tile_highlight = |pos: vec2<ICoord>,
                               color: Color,
                               framebuffer: &mut ugli::Framebuffer| {
-            self.util.draw_on_tile_with(
+            self.util.draw_on_tile(
                 &model.grid_visual,
                 pos,
                 color,
@@ -233,7 +258,7 @@ impl GameRender {
             |pos: vec2<ICoord>, tile: &Tile, framebuffer: &mut ugli::Framebuffer<'_>| {
                 if model.grid.get_tile(pos).is_none() {
                     let texture = sprites.tiles.get_texture(tile);
-                    self.util.draw_on_tile_with(
+                    self.util.draw_on_tile(
                         &model.grid_visual,
                         pos,
                         Color::new(0.7, 0.7, 0.7, 0.5),
