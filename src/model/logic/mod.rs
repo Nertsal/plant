@@ -71,84 +71,62 @@ impl Model {
                     }
                 }
                 TileKind::Seed(plant_kind) => {
-                    if let PlantKind::TypeC = plant_kind {
-                        // Grow from water
-                        let water = self
-                            .grid
-                            .get_neighbors(pos)
+                    let grow_direction = if self.config.seed_grow_only_up {
+                        vec![vec2(0, -1)]
+                    } else {
+                        Connections::NEIGHBORS.to_vec()
+                    };
+                    let grow_from = if let PlantKind::TypeC = plant_kind {
+                        // Grow from Water
+                        grow_direction
+                            .iter()
+                            .filter_map(|delta| self.grid.get_tile(pos + *delta))
                             .find(|tile| matches!(tile.tile.kind, TileKind::Water(_)))
-                            .map(|tile| tile.pos);
-                        if let Some(water) = water
-                            && !self.grid.get_neighbors(pos).any(|tile| {
-                                if let TileKind::Leaf(leaf) = &tile.tile.kind {
-                                    leaf.kind == plant_kind
+                            .map(|tile| tile.pos)
+                    } else {
+                        // Grow from Soil
+                        grow_direction
+                            .iter()
+                            .filter_map(|delta| self.grid.get_tile(pos + *delta))
+                            .filter_map(|neighbor| {
+                                if let TileKind::Soil(soil_state) = neighbor.tile.kind {
+                                    Some((neighbor.pos, soil_state))
                                 } else {
-                                    false
+                                    None
                                 }
                             })
-                            && let Some(empty) = self
-                                .grid
-                                .get_neighbors_all(pos)
-                                .filter(|tile| tile.tile.is_none())
-                                .map(|tile| tile.pos)
-                                .choose(&mut rng)
-                        {
-                            // Grow into a plant
-                            if let Some(seed) = self.grid.get_tile_mut(pos) {
-                                seed.tile.state.transform();
-                            }
-                            self.grid.set_tile(
-                                empty,
-                                Tile::new(TileKind::Leaf(
-                                    Leaf::new(plant_kind).connected(pos - empty),
-                                )),
-                            );
-                            if let Some(water) = self.grid.get_tile_mut(water) {
-                                water.tile.state.despawn();
-                            }
-                        }
-                        continue;
-                    }
-
-                    // Grow from soil
-                    let soil = self
-                        .grid
-                        .get_neighbors(pos)
-                        .filter_map(|neighbor| {
-                            if let TileKind::Soil(soil_state) = neighbor.tile.kind {
-                                Some((neighbor.pos, soil_state))
-                            } else {
-                                None
-                            }
-                        })
-                        .find(|&(_, state)| match plant_kind {
-                            PlantKind::TypeA => true,
-                            PlantKind::TypeB => state >= SoilState::Watered,
-                            PlantKind::TypeC => unreachable!(),
-                            PlantKind::TypeD => state >= SoilState::Rich,
-                        });
-                    if let Some((soil_pos, _soil_state)) = soil
-                        && !self.grid.get_neighbors(pos).any(|tile| {
-                            if let TileKind::Leaf(leaf) = &tile.tile.kind {
+                            .find(|&(_, state)| match plant_kind {
+                                PlantKind::TypeA => true,
+                                PlantKind::TypeB => state >= SoilState::Watered,
+                                PlantKind::TypeC => unreachable!(),
+                                PlantKind::TypeD => state >= SoilState::Rich,
+                            })
+                            .map(|(pos, _)| pos)
+                    };
+                    if let Some(grow_from) = grow_from
+                        && !grow_direction.iter().any(|delta| {
+                            if let Some(tile) = self.grid.get_tile(pos - *delta)
+                                && let TileKind::Leaf(leaf) = &tile.tile.kind
+                            {
                                 leaf.kind == plant_kind
                             } else {
                                 false
                             }
                         })
-                        && let Some(empty) = self
-                            .grid
-                            .get_neighbors_all(pos)
+                        && let Some(empty) = grow_direction
+                            .iter()
+                            .map(|delta| {
+                                let pos = pos - *delta;
+                                Positioned {
+                                    pos,
+                                    tile: self.grid.get_tile(pos).map(|tile| tile.tile),
+                                }
+                            })
                             .filter(|tile| tile.tile.is_none())
                             .map(|tile| tile.pos)
                             .choose(&mut rng)
-                        && let Some(soil) = self.grid.get_tile_mut(soil_pos)
-                        && let TileKind::Soil(soil_state) = &mut soil.tile.kind
                     {
                         // Grow into a plant
-                        // TODO: gradual usage of water from soil
-                        *soil_state = SoilState::Dry;
-                        soil.tile.state.transform();
-
                         if let Some(seed) = self.grid.get_tile_mut(pos) {
                             seed.tile.state.transform();
                         }
@@ -156,6 +134,17 @@ impl Model {
                             empty,
                             Tile::new(TileKind::Leaf(Leaf::new(plant_kind).connected(pos - empty))),
                         );
+                        // TODO: gradual usage of water from soil
+                        if let Some(grow_from) = self.grid.get_tile_mut(grow_from) {
+                            match &mut grow_from.tile.kind {
+                                TileKind::Water(_) => grow_from.tile.state.despawn(),
+                                TileKind::Soil(soil_state) => {
+                                    *soil_state = SoilState::Dry;
+                                    grow_from.tile.state.transform();
+                                }
+                                _ => unreachable!(),
+                            }
+                        }
                     }
                 }
                 TileKind::Soil(state) => match state {

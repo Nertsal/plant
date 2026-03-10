@@ -17,6 +17,8 @@ pub struct Config {
     pub drone_max_speed: R32,
     pub drone_reach: R32,
 
+    pub seed_grow_only_up: bool,
+
     pub action_duration: HashMap<DroneAction, Time>,
 
     pub rock_frequency: R32,

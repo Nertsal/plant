@@ -4,6 +4,8 @@ Config(
     drone_max_speed: 20.0,
     drone_reach: 0.5,
 
+    seed_grow_only_up: true,
+
     action_duration: {
         CutPlant: 3.0,
         Collect: 2.0,
