@@ -127,6 +127,27 @@ impl GameRender {
                 &model.camera,
                 framebuffer,
             );
+
+            if let Some(t) = tile.tile.action_progress() {
+                // Tile action progress
+                let t = t.as_f32();
+                let pos = Aabb2::point(
+                    model.grid_visual.tile_bounds(pos).center().as_f32()
+                        + vec2(0.0, -8.0) * pixel_scale,
+                )
+                .extend_symmetric(vec2(8.0, 2.0) * pixel_scale);
+                self.context.geng.draw2d().quad(
+                    framebuffer,
+                    &model.camera,
+                    pos,
+                    palette.progress_background,
+                );
+                let pos = pos.extend_uniform(-pixel_scale).split_left(t);
+                self.context
+                    .geng
+                    .draw2d()
+                    .quad(framebuffer, &model.camera, pos, palette.progress);
+            }
         }
 
         let tile_highlight = |pos: vec2<ICoord>,

@@ -108,8 +108,8 @@ impl Model {
                     SoilState::Rich => {}
                 },
                 Tile::Water(ref mut lifetime) => {
-                    *lifetime -= delta_time;
-                    if *lifetime <= Time::ZERO {
+                    lifetime.remaining -= delta_time;
+                    if lifetime.remaining <= Time::ZERO {
                         // Evaporate
                         self.grid.remove_tile(pos);
                     }
@@ -143,7 +143,8 @@ impl Model {
                     match &mut bug.state {
                         BugState::Hungry { hunger, .. } => {
                             if *hunger == 0 {
-                                bug.state = BugState::Pooping(self.config.bug_poop_time);
+                                bug.state =
+                                    BugState::Pooping(Lifetime::new(self.config.bug_poop_time));
                                 continue;
                             }
 
@@ -187,9 +188,9 @@ impl Model {
                                         hunger,
                                     } = &mut bug.state
                                 {
-                                    *eating_timer -= delta_time;
-                                    if *eating_timer <= Time::ZERO {
-                                        *eating_timer = self.config.bug_eat_time;
+                                    eating_timer.remaining -= delta_time;
+                                    if eating_timer.remaining <= Time::ZERO {
+                                        *eating_timer = Lifetime::new(self.config.bug_eat_time);
                                         *hunger -= 1;
                                         self.cut_plant_tile(target, false);
                                         self.context.sfx.play(&self.context.assets.sounds.bug_eat);
@@ -201,16 +202,18 @@ impl Model {
                             }
                         }
                         BugState::Pooping(timer) => {
-                            *timer -= delta_time;
-                            if *timer <= Time::ZERO {
+                            timer.remaining -= delta_time;
+                            if timer.remaining <= Time::ZERO {
                                 let target = self
                                     .grid
                                     .get_neighbors_all(pos)
                                     .find(|tile| tile.tile.is_none())
                                     .map(|tile| tile.pos);
                                 if let Some(target) = target {
-                                    self.grid
-                                        .set_tile(target, Tile::Poop(self.config.poop_lifetime));
+                                    self.grid.set_tile(
+                                        target,
+                                        Tile::Poop(Lifetime::new(self.config.poop_lifetime)),
+                                    );
                                     self.context.sfx.play(&self.context.assets.sounds.bug_poop);
                                     if let Some(bug) = self.grid.get_tile_mut(pos)
                                         && let Tile::Bug(bug) = bug.tile
@@ -227,7 +230,7 @@ impl Model {
                             if *time <= Time::ZERO {
                                 bug.state = BugState::Hungry {
                                     hunger: self.config.bug_hunger,
-                                    eating_timer: self.config.bug_eat_time,
+                                    eating_timer: Lifetime::new(self.config.bug_eat_time),
                                 };
                             } else {
                                 // Move in available random direction
@@ -245,8 +248,8 @@ impl Model {
                     }
                 }
                 Tile::Poop(ref mut lifetime) => {
-                    *lifetime -= delta_time;
-                    if *lifetime <= Time::ZERO {
+                    lifetime.remaining -= delta_time;
+                    if lifetime.remaining <= Time::ZERO {
                         self.grid.remove_tile(pos);
                     }
                 }
@@ -286,8 +289,10 @@ impl Model {
                         if let Some(target) = empty_tiles.into_iter().choose(&mut rng) {
                             // Pipe water to a sprinkler
                             self.grid.remove_tile(water);
-                            self.grid
-                                .set_tile(target, Tile::Water(self.config.water_lifetime));
+                            self.grid.set_tile(
+                                target,
+                                Tile::Water(Lifetime::new(self.config.water_lifetime)),
+                            );
                         } else {
                             // Collect water to player inventory
                             self.collect(water);
@@ -307,10 +312,10 @@ impl Model {
                     {
                         cutter.powered = powered;
                         if powered {
-                            cutter.cooldown -= delta_time;
-                            if cutter.cooldown <= Time::ZERO {
+                            cutter.cooldown.remaining -= delta_time;
+                            if cutter.cooldown.remaining <= Time::ZERO {
                                 // Cut down a nearby plant
-                                cutter.cooldown = self.config.cutter_cooldown;
+                                cutter.cooldown = Lifetime::new(self.config.cutter_cooldown);
                                 let plant = self
                                     .grid
                                     .all_tiles()
@@ -440,8 +445,10 @@ impl Model {
                     let offset = vec2(rng.gen_range(-2..=2), rng.gen_range(-2..=2));
                     let target = anchor + offset;
                     if self.grid.in_bounds(target) && self.grid.get_tile(target).is_none() {
-                        self.grid
-                            .set_tile(target, Tile::Water(self.config.water_lifetime));
+                        self.grid.set_tile(
+                            target,
+                            Tile::Water(Lifetime::new(self.config.water_lifetime)),
+                        );
                         break;
                     }
                 }
@@ -465,7 +472,7 @@ impl Model {
                             id: self.next_id,
                             state: BugState::Hungry {
                                 hunger: self.config.bug_hunger,
-                                eating_timer: self.config.bug_eat_time,
+                                eating_timer: Lifetime::new(self.config.bug_eat_time),
                             },
                             move_timer: self.config.bug_move_time,
                         }),

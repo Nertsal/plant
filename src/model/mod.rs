@@ -197,24 +197,51 @@ pub struct Bug {
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub enum BugState {
-    Hungry { hunger: usize, eating_timer: Time },
-    Pooping(Time),
-    Chilling { time: Time },
+    Hungry {
+        hunger: usize,
+        eating_timer: Lifetime,
+    },
+    Pooping(Lifetime),
+    Chilling {
+        time: Time,
+    },
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(default)]
 pub struct Cutter {
     pub powered: bool,
-    pub cooldown: Time,
+    pub cooldown: Lifetime,
 }
 
 impl Default for Cutter {
     fn default() -> Self {
         Self {
             powered: false,
-            cooldown: R32::ONE,
+            cooldown: Lifetime::new(R32::ONE),
         }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct Lifetime {
+    pub remaining: Time,
+    pub max: Time,
+}
+
+impl Lifetime {
+    pub fn new(max: Time) -> Self {
+        Self {
+            remaining: max,
+            max,
+        }
+    }
+
+    pub fn ratio(&self) -> Time {
+        if self.max == Time::ZERO {
+            return Time::ZERO;
+        }
+        self.remaining / self.max
     }
 }
 
@@ -224,9 +251,9 @@ pub enum Tile {
     Leaf(Leaf),
     Light(bool),
     Soil(SoilState),
-    Water(Time),
+    Water(Lifetime),
     Bug(Bug),
-    Poop(Time),
+    Poop(Lifetime),
     Power,
     Wire(bool),
     Drainer,
@@ -339,6 +366,23 @@ impl Tile {
 
     pub fn is_piping(&self) -> bool {
         matches!(self, Tile::Drainer | Tile::Pipe(_) | Tile::Sprinkler(_))
+    }
+
+    pub fn action_progress(&self) -> Option<R32> {
+        match self {
+            Tile::Leaf(leaf) => leaf.growth_timer.map(|t| R32::ONE - t),
+            Tile::Water(lifetime) | Tile::Poop(lifetime) => Some(lifetime.ratio()),
+            Tile::Cutter(cutter) => Some(cutter.cooldown.ratio()),
+            Tile::Bug(bug) => match &bug.state {
+                BugState::Hungry { eating_timer, .. } => {
+                    let t = eating_timer.ratio();
+                    (t < Time::ONE).then_some(t)
+                }
+                BugState::Pooping(timer) => Some(timer.ratio()),
+                _ => None,
+            },
+            _ => None,
+        }
     }
 }
 

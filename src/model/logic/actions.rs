@@ -117,7 +117,7 @@ impl Model {
             let mut tile = self.grid.remove_tile(target).unwrap();
             match &mut tile.tile {
                 Tile::Water(lifetime) | Tile::Poop(lifetime) => {
-                    *lifetime = self.config.water_lifetime
+                    *lifetime = Lifetime::new(self.config.water_lifetime);
                 }
                 Tile::Light(powered) | Tile::Wire(powered) => *powered = false,
                 _ => {}
