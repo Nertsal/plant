@@ -784,6 +784,7 @@ fn get_whole_plant(grid: &Grid, start: vec2<ICoord>) -> Vec<vec2<ICoord>> {
     let mut to_check = vec![start];
     while let Some(pos) = to_check.pop() {
         if let Some(tile) = grid.get_tile(pos)
+            && tile.tile.state.interactive()
             && let TileKind::Leaf(leaf) = &tile.tile.kind
         {
             let connections: Vec<_> = leaf
@@ -792,17 +793,13 @@ fn get_whole_plant(grid: &Grid, start: vec2<ICoord>) -> Vec<vec2<ICoord>> {
                 .map(|other| other.pos)
                 .filter(|&other| {
                     !connected.contains(&other)
-                        && grid.get_tile(other).is_some_and(|other| {
-                            if other.tile.state.interactive() {
-                                match other.tile.kind {
-                                    TileKind::Leaf(ref other) => other.kind == leaf.kind,
-                                    TileKind::Seed(kind) => kind == leaf.kind,
-                                    _ => false,
-                                }
-                            } else {
-                                false
-                            }
-                        })
+                        && grid
+                            .get_tile(other)
+                            .is_some_and(|other| match other.tile.kind {
+                                TileKind::Leaf(ref other) => other.kind == leaf.kind,
+                                TileKind::Seed(kind) => kind == leaf.kind,
+                                _ => false,
+                            })
                 })
                 .collect();
             connected.extend(connections.clone());
