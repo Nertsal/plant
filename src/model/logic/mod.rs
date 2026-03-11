@@ -67,12 +67,12 @@ impl Model {
                 TileKind::Light(_) | TileKind::Wire(_) => {
                     let mut powered = false;
                     get_all_connected(&self.grid, pos, |tile| {
-                        if tile.tile.state.interactive()
+                        if tile.tile.state.alive()
                             && let TileKind::Power = tile.tile.kind
                         {
                             powered = true;
                         }
-                        tile.tile.state.interactive() && tile.tile.kind.transmits_power()
+                        tile.tile.state.alive() && tile.tile.kind.transmits_power()
                     });
                     if let Some(tile) = self.grid.get_tile_mut(pos)
                         && let TileKind::Light(power) | TileKind::Wire(power) = &mut tile.tile.kind
@@ -383,24 +383,26 @@ impl Model {
                         // Look for a sprinkler
                         let mut sprinklers = Vec::new();
                         get_all_connected(&self.grid, pos, |tile| {
-                            if tile.tile.state.interactive()
+                            if tile.tile.state.alive()
                                 && let TileKind::Sprinkler(_) = tile.tile.kind
                             {
                                 sprinklers.push(tile.pos);
                             }
-                            tile.tile.state.interactive() && tile.tile.kind.is_piping()
+                            tile.tile.state.alive() && tile.tile.kind.is_piping()
                         });
 
-                        let empty_tiles: HashSet<vec2<ICoord>> = sprinklers
+                        let empty_tiles: HashMap<vec2<ICoord>, vec2<ICoord>> = sprinklers
                             .into_iter()
-                            .flat_map(|pos| {
+                            .flat_map(|sprinkler_pos| {
                                 self.grid
-                                    .get_neighbors_all(pos)
+                                    .get_neighbors_all(sprinkler_pos)
                                     .filter(|tile| tile.tile.is_none())
-                                    .map(|tile| tile.pos)
+                                    .map(move |tile| (tile.pos, sprinkler_pos))
                             })
                             .collect();
-                        if let Some(target) = empty_tiles.into_iter().choose(&mut rng) {
+                        if let Some((target, sprinkler_pos)) =
+                            empty_tiles.into_iter().choose(&mut rng)
+                        {
                             // Pipe water to a sprinkler
                             if let Some(water) = self.grid.get_tile_mut(water) {
                                 water.tile.state.despawn();
@@ -411,6 +413,9 @@ impl Model {
                                     self.config.water_lifetime,
                                 ))),
                             );
+                            if let Some(sprinkler) = self.grid.get_tile_mut(sprinkler_pos) {
+                                sprinkler.tile.state.transform()
+                            }
                         } else {
                             // Collect water to player inventory
                             self.collect(water);
@@ -420,12 +425,12 @@ impl Model {
                 TileKind::Cutter(_) => {
                     let mut powered = false;
                     get_all_connected(&self.grid, pos, |tile| {
-                        if tile.tile.state.interactive()
+                        if tile.tile.state.alive()
                             && let TileKind::Power = tile.tile.kind
                         {
                             powered = true;
                         }
-                        tile.tile.state.interactive() && tile.tile.kind.transmits_power()
+                        tile.tile.state.alive() && tile.tile.kind.transmits_power()
                     });
                     if let Some(tile) = self.grid.get_tile_mut(pos)
                         && let TileKind::Cutter(cutter) = &mut tile.tile.kind
@@ -458,12 +463,12 @@ impl Model {
                 TileKind::Pipe(_) | TileKind::Sprinkler(_) => {
                     let mut piped = false;
                     get_all_connected(&self.grid, pos, |tile| {
-                        if tile.tile.state.interactive()
+                        if tile.tile.state.alive()
                             && let TileKind::Drainer = tile.tile.kind
                         {
                             piped = true;
                         }
-                        tile.tile.state.interactive() && tile.tile.kind.is_piping()
+                        tile.tile.state.alive() && tile.tile.kind.is_piping()
                     });
                     if let Some(tile) = self.grid.get_tile_mut(pos)
                         && let TileKind::Pipe(connected) | TileKind::Sprinkler(connected) =
@@ -511,7 +516,7 @@ impl Model {
                 let group = get_whole_plant(&self.grid, tile.pos);
                 let rooted = group.iter().any(|&pos| {
                     if let Some(tile) = self.grid.get_tile(pos)
-                        && tile.tile.state.interactive()
+                        && tile.tile.state.alive()
                         && let TileKind::Seed(seed) = &tile.tile.kind
                     {
                         seed.kind == plant_kind
@@ -778,7 +783,7 @@ fn get_whole_plant(grid: &Grid, start: vec2<ICoord>) -> Vec<vec2<ICoord>> {
     let mut to_check = vec![start];
     while let Some(pos) = to_check.pop() {
         if let Some(tile) = grid.get_tile(pos)
-            && tile.tile.state.interactive()
+            && tile.tile.state.alive()
             && let TileKind::Leaf(leaf) = &tile.tile.kind
         {
             let connections: Vec<_> = leaf

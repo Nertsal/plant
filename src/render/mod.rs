@@ -225,7 +225,7 @@ impl GameRender {
             connections.insert((a, b), color);
         };
         for tile in model.grid.all_tiles() {
-            if !tile.tile.state.interactive() {
+            if !tile.tile.state.alive() {
                 continue;
             }
             match &tile.tile.kind {
