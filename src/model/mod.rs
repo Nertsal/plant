@@ -350,10 +350,10 @@ impl TileKind {
         match self {
             TileKind::GhostBlock => "You are not supposed to see this",
             TileKind::Seed(kind) => match kind {
-                PlantKind::TypeA => "Grows from Dry Soil",
-                PlantKind::TypeB => "Grows from Soil",
-                PlantKind::TypeC => "Grows from Water",
-                PlantKind::TypeD => "Grows from Rich Soil",
+                PlantKind::TypeA => "Grows from Dry Soil/ Soil/ Rich Soil",
+                PlantKind::TypeB => "Grows from Soil/ Rich Soil",
+                PlantKind::TypeC => "Grows only from Water",
+                PlantKind::TypeD => "Grows only from Rich Soil",
             },
             TileKind::Leaf(leaf) => match leaf.kind {
                 PlantKind::TypeA => "Sells for 3g",
@@ -361,24 +361,24 @@ impl TileKind {
                 PlantKind::TypeC => "Sells for 50g",
                 PlantKind::TypeD => "Sells for 30g",
             },
-            TileKind::Light(_) => "Plants grow within range\nrequires Power",
+            TileKind::Light(_) => "Plants grow within range\nRequires Power to function",
             TileKind::Soil(state) => match state {
-                SoilState::Dry => "",
-                SoilState::Watered => "",
-                SoilState::Rich => "",
+                SoilState::Dry => "Consumes adjacent water and turns into soil",
+                SoilState::Watered => "Consumes poop nearby and turns into rich soil\nTurns into dry soil after plant growth",
+                SoilState::Rich => "Turns into dry soil after plant growth",
             },
-            TileKind::Water(_) => "",
-            TileKind::Bug(_) => "Eats Plants and produces Poop",
-            TileKind::Poop(_) => "Can be used to nourish the soil",
-            TileKind::Power => "Provides power to connected tiles",
-            TileKind::Wire(_) => "",
+            TileKind::Water(_) => "Disappears overtime",
+            TileKind::Bug(_) => "Eats Plants and produces Poop\nSpawned in unlit areas",
+            TileKind::Poop(_) => "Can be used to nourish the soil\nDisappears overtime",
+            TileKind::Power => "Provides power to tiles connected with wires",
+            TileKind::Wire(_) => "Connection between power and light\nCan be destroyed by bugs and plants",
             TileKind::Drainer => {
                 "Collects Water within range to your inventory or to connected Sprinklers"
             }
-            TileKind::Cutter(_) => "Automatically cuts adjacent Plants\nrequires Power",
-            TileKind::Pipe(_) => "",
-            TileKind::Sprinkler(_) => "Ejects water on adjacent tiles",
-            TileKind::Rock => "",
+            TileKind::Cutter(_) => "Automatically cuts adjacent Plants\nRequires Power",
+            TileKind::Pipe(_) => "Connection between water collector and sprinkler\nCan be destroyed by bugs and plants",
+            TileKind::Sprinkler(_) => "Ejects water on adjacent tiles when connected to a drainer with pipes",
+            TileKind::Rock => "Blocks plants growth and bugs",
         }
     }
 
