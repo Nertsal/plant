@@ -45,17 +45,7 @@ impl Model {
         let plant_config = &self.config.plants[&leaf.kind];
 
         // Check plant size
-        let plant_size = get_all_connected(&self.grid, plant.pos, |tile| {
-            if tile.tile.state.interactive()
-                && let TileKind::Leaf(other) = &tile.tile.kind
-                && leaf.kind == other.kind
-            {
-                true
-            } else {
-                false
-            }
-        })
-        .len();
+        let plant_size = get_whole_plant(&self.grid, plant.pos).len();
 
         let_leaf!(let mut plant, leaf);
         leaf.connections = connections;
