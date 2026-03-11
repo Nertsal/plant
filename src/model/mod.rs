@@ -147,6 +147,48 @@ impl<T> Connections<T> {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(from = "PlantKind")]
+pub struct Seed {
+    pub kind: PlantKind,
+    /// How much growth we have of each speed multiplier.
+    pub growth_energy: LinearMap<Time, R32>,
+}
+
+impl From<PlantKind> for Seed {
+    fn from(value: PlantKind) -> Self {
+        Self::new(value)
+    }
+}
+
+impl Seed {
+    pub fn new(kind: PlantKind) -> Self {
+        Self {
+            kind,
+            growth_energy: LinearMap::new(),
+        }
+    }
+
+    pub fn total_energy(&self) -> R32 {
+        self.growth_energy
+            .values()
+            .copied()
+            .fold(R32::ZERO, R32::add)
+    }
+
+    pub fn use_energy(&mut self, mut energy: R32) {
+        for (_, remaining) in self.growth_energy.iter_mut().sorted_by_key(|(s, _)| **s) {
+            if *remaining >= energy {
+                *remaining -= energy;
+                break;
+            } else {
+                energy -= *remaining;
+                *remaining = R32::ZERO;
+            }
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct Leaf {
     /// Time until the plant attempts to grow.
     pub growth_timer: Option<Time>,
@@ -218,9 +260,16 @@ impl Default for Cutter {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(default)]
 pub struct Lifetime {
     pub remaining: Time,
     pub max: Time,
+}
+
+impl Default for Lifetime {
+    fn default() -> Self {
+        Self::new(Time::ONE)
+    }
 }
 
 impl Lifetime {
@@ -243,7 +292,7 @@ impl Lifetime {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct Tile {
     pub state: TileState,
     pub kind: TileKind,
@@ -276,6 +325,10 @@ impl TileState {
         matches!(self, TileState::Idle)
     }
 
+    pub fn alive(&self) -> bool {
+        !matches!(self, TileState::Spawning(_) | TileState::Despawning(_))
+    }
+
     pub fn despawn(&mut self) {
         if !matches!(self, Self::Despawning(_)) {
             *self = Self::Despawning(Lifetime::new(Time::ONE));
@@ -306,7 +359,7 @@ pub enum TileKind {
     /// Not a real tile, but a placeholder to prevent stuff from happening.
     /// Used by animations and such.
     GhostBlock(ExistentialReason),
-    Seed(PlantKind),
+    Seed(Seed),
     Leaf(Leaf),
     Light(bool),
     Soil(SoilState),
@@ -326,7 +379,7 @@ impl TileKind {
     pub fn name(&self) -> &'static str {
         match self {
             TileKind::GhostBlock(_) => "Huh?",
-            TileKind::Seed(kind) => match kind {
+            TileKind::Seed(seed) => match seed.kind {
                 PlantKind::TypeA => "Seed (A)",
                 PlantKind::TypeB => "Seed (B)",
                 PlantKind::TypeC => "Seed (C)",
@@ -360,7 +413,7 @@ impl TileKind {
     pub fn description(&self) -> &'static str {
         match self {
             TileKind::GhostBlock(_) => "You are not supposed to see this",
-            TileKind::Seed(kind) => match kind {
+            TileKind::Seed(seed) => match seed.kind {
                 PlantKind::TypeA => "Grows from Dry Soil/ Soil/ Rich Soil",
                 PlantKind::TypeB => "Grows from Soil/ Rich Soil",
                 PlantKind::TypeC => "Grows only from Water",
@@ -440,7 +493,7 @@ impl TileKind {
         )
     }
 
-    pub fn action_progress(&self) -> Option<R32> {
+    pub fn action_progress(&self, config: &Config) -> Option<R32> {
         match self {
             TileKind::Leaf(leaf) => leaf
                 .growth_timer
@@ -456,6 +509,15 @@ impl TileKind {
                 BugState::Pooping(timer) => Some(timer.ratio()),
                 _ => None,
             },
+            TileKind::Seed(seed) => {
+                let seed_energy = seed
+                    .growth_energy
+                    .values()
+                    .copied()
+                    .fold(R32::ZERO, R32::add);
+                let config = config.plants.get(&seed.kind)?;
+                Some(seed_energy / config.growth_capacity)
+            }
             _ => None,
         }
     }
@@ -613,7 +675,7 @@ impl Model {
                 target: DroneTarget::MoveTo(vec2::ZERO),
                 action_progress: R32::ZERO,
             },
-            inventory: vec![(TileKind::Seed(PlantKind::TypeA), 1)],
+            inventory: vec![(TileKind::Seed(Seed::new(PlantKind::TypeA)), 1)],
 
             config,
             context,

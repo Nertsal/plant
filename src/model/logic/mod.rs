@@ -80,40 +80,56 @@ impl Model {
                         *power = powered;
                     }
                 }
-                TileKind::Seed(plant_kind) => {
+                TileKind::Seed(ref seed) => {
+                    let plant_kind = seed.kind;
+                    let config = &self.config.plants[&plant_kind];
                     let grow_direction = if self.config.seed_grow_only_up {
                         vec![vec2(0, -1)]
                     } else {
                         Connections::NEIGHBORS.to_vec()
                     };
-                    let grow_from = if let PlantKind::TypeC = plant_kind {
-                        // Grow from Water
-                        grow_direction
-                            .iter()
-                            .filter_map(|delta| self.grid.get_tile(pos + *delta))
-                            .find(|tile| matches!(tile.tile.kind, TileKind::Water(_)))
-                            .map(|tile| tile.pos)
-                    } else {
-                        // Grow from Soil
-                        grow_direction
-                            .iter()
-                            .filter_map(|delta| self.grid.get_tile(pos + *delta))
-                            .filter_map(|neighbor| {
-                                if let TileKind::Soil(soil_state) = neighbor.tile.kind {
-                                    Some((neighbor.pos, soil_state))
-                                } else {
-                                    None
-                                }
-                            })
-                            .find(|&(_, state)| match plant_kind {
-                                PlantKind::TypeA => true,
-                                PlantKind::TypeB => state >= SoilState::Watered,
-                                PlantKind::TypeC => unreachable!(),
-                                PlantKind::TypeD => state >= SoilState::Rich,
-                            })
-                            .map(|(pos, _)| pos)
-                    };
-                    if let Some(grow_from) = grow_from
+
+                    // Current energy of the seed
+                    let seed_energy = seed.total_energy();
+
+                    // Grow from Soil
+                    let grow_from = grow_direction
+                        .iter()
+                        .filter_map(|delta| self.grid.get_tile(pos + *delta))
+                        .filter(|tile| tile.tile.state.interactive())
+                        .find_map(|neighbor| {
+                            let mut kind = neighbor.tile.kind.clone();
+                            if let TileKind::Water(lifetime) = &mut kind {
+                                *lifetime = Lifetime::default();
+                            }
+                            config.soils.get(&kind).map(|config| (neighbor, config))
+                        });
+
+                    if let Some((grow_from, soil_config)) = grow_from
+                        && config.growth_capacity - seed_energy >= soil_config.capacity
+                        && let Some(grow_from) = self.grid.get_tile_mut(grow_from.pos)
+                    {
+                        // Take energy from soil
+                        match &mut grow_from.tile.kind {
+                            TileKind::Soil(state) => {
+                                *state = SoilState::Dry;
+                                grow_from.tile.state.transform();
+                            }
+                            TileKind::Water(_) => {
+                                grow_from.tile.state.despawn();
+                            }
+                            _ => {}
+                        }
+                        if let Some(tile) = self.grid.get_tile_mut(pos)
+                            && let TileKind::Seed(seed) = &mut tile.tile.kind
+                        {
+                            tile.tile.state.transform();
+                            *seed
+                                .growth_energy
+                                .entry(soil_config.growth_speed)
+                                .or_insert(Time::ZERO) += soil_config.capacity;
+                        }
+                    } else if seed_energy >= R32::ONE
                         && !grow_direction.iter().any(|delta| {
                             if let Some(tile) = self.grid.get_tile(pos - *delta)
                                 && let TileKind::Leaf(leaf) = &tile.tile.kind
@@ -130,24 +146,16 @@ impl Model {
                             .choose(&mut rng)
                     {
                         // Grow into a plant
-                        if let Some(seed) = self.grid.get_tile_mut(pos) {
-                            seed.tile.state.transform();
+                        if let Some(tile) = self.grid.get_tile_mut(pos)
+                            && let TileKind::Seed(seed) = &mut tile.tile.kind
+                        {
+                            tile.tile.state.transform();
+                            seed.use_energy(R32::ONE);
                         }
                         self.grid.set_tile(
                             empty,
                             Tile::new(TileKind::Leaf(Leaf::new(plant_kind).connected(pos - empty))),
                         );
-                        // TODO: gradual usage of water from soil
-                        if let Some(grow_from) = self.grid.get_tile_mut(grow_from) {
-                            match &mut grow_from.tile.kind {
-                                TileKind::Water(_) => grow_from.tile.state.despawn(),
-                                TileKind::Soil(soil_state) => {
-                                    *soil_state = SoilState::Dry;
-                                    grow_from.tile.state.transform();
-                                }
-                                _ => unreachable!(),
-                            }
-                        }
                     }
                 }
                 TileKind::Soil(state) => match state {
@@ -478,7 +486,7 @@ impl Model {
         };
         let (plant_kind, leaf_connections) = match &tile.tile.kind {
             TileKind::Leaf(leaf) => (leaf.kind, Some(leaf.connections.clone())),
-            TileKind::Seed(kind) => (*kind, None),
+            TileKind::Seed(seed) => (seed.kind, None),
             _ => return,
         };
         let config = &self.config.plants[&plant_kind];
@@ -488,7 +496,7 @@ impl Model {
                 self.money += config.price;
             }
         } else {
-            self.inventory_add(TileKind::Seed(plant_kind), 1);
+            self.inventory_add(TileKind::Seed(Seed::new(plant_kind)), 1);
         }
 
         let mut lost_plants = Vec::new();
@@ -504,9 +512,9 @@ impl Model {
                 let rooted = group.iter().any(|&pos| {
                     if let Some(tile) = self.grid.get_tile(pos)
                         && tile.tile.state.interactive()
-                        && let TileKind::Seed(seed) = tile.tile.kind
+                        && let TileKind::Seed(seed) = &tile.tile.kind
                     {
-                        seed == plant_kind
+                        seed.kind == plant_kind
                     } else {
                         false
                     }
@@ -781,9 +789,9 @@ fn get_whole_plant(grid: &Grid, start: vec2<ICoord>) -> Vec<vec2<ICoord>> {
                     !connected.contains(&other)
                         && grid
                             .get_tile(other)
-                            .is_some_and(|other| match other.tile.kind {
-                                TileKind::Leaf(ref other) => other.kind == leaf.kind,
-                                TileKind::Seed(kind) => kind == leaf.kind,
+                            .is_some_and(|other| match &other.tile.kind {
+                                TileKind::Leaf(other) => other.kind == leaf.kind,
+                                TileKind::Seed(seed) => seed.kind == leaf.kind,
                                 _ => false,
                             })
                 })

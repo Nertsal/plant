@@ -45,7 +45,19 @@ impl Model {
         let plant_config = &self.config.plants[&leaf.kind];
 
         // Check plant size
-        let plant_size = get_whole_plant(&self.grid, plant.pos).len();
+        let whole_plant = get_whole_plant(&self.grid, plant.pos);
+        let plant_size = whole_plant.len();
+        let plant_seed = whole_plant.into_iter().find_map(|pos| {
+            if let Some(tile) = self.grid.get_tile(pos)
+                && let TileKind::Seed(seed) = &tile.tile.kind
+            {
+                Some((tile.pos, seed.total_energy()))
+            } else {
+                None
+            }
+        });
+        let energy_available = plant_seed.map_or(R32::ZERO, |(_, e)| e);
+        let plant_seed = plant_seed.map(|(p, _)| p);
 
         let_leaf!(let mut plant, leaf);
         leaf.connections = connections;
@@ -64,18 +76,27 @@ impl Model {
         }
 
         let mut grow = false;
+        let mut energy_used = R32::ZERO;
         if let Some(timer) = &mut leaf.growth_timer {
             let growth_time = if is_lit {
                 plant_config.growth_time
             } else {
                 plant_config.growth_time_dark
             };
-            *timer -= delta_time / growth_time;
+            energy_used = (delta_time / growth_time).min(energy_available);
+            *timer -= energy_used;
             if *timer <= Time::ZERO {
                 // Attempt to grow
                 grow = true;
                 leaf.growth_timer = None;
             }
+        }
+
+        if let Some(seed) = plant_seed
+            && let Some(tile) = self.grid.get_tile_mut(seed)
+            && let TileKind::Seed(seed) = &mut tile.tile.kind
+        {
+            seed.use_energy(energy_used);
         }
 
         if !grow {
@@ -157,6 +178,13 @@ impl Model {
         }
         if let Some(grow) = grow_right {
             leaf.connections.set(grow - position, Some(()));
+        }
+
+        if grow_left.is_some()
+            && let Some(seed) = plant_seed
+            && let Some(tile) = self.grid.get_tile_mut(seed)
+        {
+            tile.tile.state.transform();
         }
     }
 }

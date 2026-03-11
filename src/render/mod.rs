@@ -189,8 +189,8 @@ impl GameRender {
                 framebuffer,
             );
 
-            if tile.tile.state.interactive()
-                && let Some(t) = tile.tile.kind.action_progress()
+            if tile.tile.state.alive()
+                && let Some(t) = tile.tile.kind.action_progress(&model.config)
             {
                 // Tile action progress
                 let t = t.as_f32();

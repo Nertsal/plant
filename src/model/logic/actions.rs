@@ -87,6 +87,7 @@ impl Model {
                 | TileKind::Wire(powered)
                 | TileKind::Sprinkler(powered) => *powered = false,
                 TileKind::Cutter(cutter) => *cutter = Cutter::default(),
+                TileKind::Seed(seed) => seed.growth_energy.clear(),
                 _ => {}
             }
             self.inventory_add(kind, 1);

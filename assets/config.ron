@@ -42,24 +42,64 @@ Config(
             growth_time_dark: 10.0,
             max_size: 10,
             price: 3,
+            growth_capacity: 20, // How many leaves grow when fully charged from soil before needing recharge
+            soils: {
+                Soil(Dry): (
+                    growth_speed: 1.0, // Growth speed multiplier
+                    capacity: 10, // How many leaves grow from a single soil
+                ),
+                Soil(Watered): (
+                    growth_speed: 1.5,
+                    capacity: 10,
+                ),
+                Soil(Rich): (
+                    growth_speed: 2.0,
+                    capacity: 10,
+                ),
+            },
         ),
         TypeB: (
             growth_time: 8.0,
             growth_time_dark: 16.0,
             max_size: 8,
             price: 10,
+            growth_capacity: 16,
+            soils: {
+                Soil(Watered): (
+                    growth_speed: 1.0,
+                    capacity: 8,
+                ),
+                Soil(Rich): (
+                    growth_speed: 2.0,
+                    capacity: 8,
+                ),
+            },
         ),
         TypeC: (
             growth_time: 15.0,
             growth_time_dark: 35.0,
             max_size: 6,
             price: 50,
+            growth_capacity: 18,
+            soils: {
+                Water(()): (
+                    growth_speed: 1.0,
+                    capacity: 6,
+                ),
+            },
         ),
         TypeD: (
             growth_time: 10.0,
             growth_time_dark: 25.0,
             max_size: 25,
             price: 30,
+            growth_capacity: 50,
+            soils: {
+                Soil(Rich): (
+                    growth_speed: 1.0,
+                    capacity: 25,
+                ),
+            },
         ),
     },
 
