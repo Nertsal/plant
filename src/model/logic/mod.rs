@@ -427,16 +427,17 @@ impl Model {
                             if cutter.cooldown.remaining <= Time::ZERO {
                                 // Cut down a nearby plant
                                 cutter.cooldown = Lifetime::new(self.config.cutter_cooldown);
-                                let plant = self
+                                let plants: Vec<_> = self
                                     .grid
                                     .all_tiles()
-                                    .find(|tile| {
+                                    .filter(|tile| {
                                         manhattan_distance(pos, tile.pos)
                                             <= self.config.cutter_radius
                                             && matches!(tile.tile.kind, TileKind::Leaf(_))
                                     })
-                                    .map(|tile| tile.pos);
-                                if let Some(plant) = plant {
+                                    .map(|tile| tile.pos)
+                                    .collect();
+                                for plant in plants {
                                     self.cut_plant_tile(plant, true);
                                 }
                             }
