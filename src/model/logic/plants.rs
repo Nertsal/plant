@@ -44,8 +44,30 @@ impl Model {
         let mut rng = thread_rng();
         let plant_config = &self.config.plants[&leaf.kind];
 
-        // Update growth timer
+        // Check plant size
+        let plant_size = get_all_connected(&self.grid, plant.pos, |tile| {
+            if tile.tile.state.interactive()
+                && let TileKind::Leaf(other) = &tile.tile.kind
+                && leaf.kind == other.kind
+            {
+                true
+            } else {
+                false
+            }
+        })
+        .len();
+
         let_leaf!(let mut plant, leaf);
+
+        if plant_size >= plant_config.max_size {
+            // Over max size
+            if let Some(timer) = &mut leaf.growth_timer {
+                *timer = Time::ONE;
+            }
+            return;
+        }
+
+        // Update growth timer
         leaf.connections = connections;
         if leaf.growth_timer.is_none() && connect_count <= 1 {
             leaf.growth_timer = Some(R32::ONE);
@@ -72,24 +94,6 @@ impl Model {
 
         // Grow
         let_leaf!(let plant, leaf);
-        if get_all_connected(&self.grid, plant.pos, |tile| {
-            if tile.tile.state.interactive()
-                && let TileKind::Leaf(other) = &tile.tile.kind
-                && leaf.kind == other.kind
-            {
-                true
-            } else {
-                false
-            }
-        })
-        .len()
-            >= plant_config.max_size
-        {
-            // Over max size
-            return;
-        }
-
-        // Grow
         let lights: Vec<vec2<ICoord>> = self
             .grid
             .all_tiles()

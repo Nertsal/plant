@@ -442,7 +442,10 @@ impl TileKind {
 
     pub fn action_progress(&self) -> Option<R32> {
         match self {
-            TileKind::Leaf(leaf) => leaf.growth_timer.map(|t| R32::ONE - t),
+            TileKind::Leaf(leaf) => leaf
+                .growth_timer
+                .map(|t| Time::ONE - t)
+                .filter(|&t| t > Time::ZERO),
             TileKind::Water(lifetime) | TileKind::Poop(lifetime) => Some(lifetime.ratio()),
             TileKind::Cutter(cutter) => Some(cutter.cooldown.ratio()),
             TileKind::Bug(bug) => match &bug.state {
