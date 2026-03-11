@@ -447,7 +447,7 @@ impl TileKind {
                 .map(|t| Time::ONE - t)
                 .filter(|&t| t > Time::ZERO),
             TileKind::Water(lifetime) | TileKind::Poop(lifetime) => Some(lifetime.ratio()),
-            TileKind::Cutter(cutter) => Some(cutter.cooldown.ratio()),
+            TileKind::Cutter(cutter) => Some(cutter.cooldown.ratio()).filter(|&t| t < R32::ONE),
             TileKind::Bug(bug) => match &bug.state {
                 BugState::Hungry { eating_timer, .. } => {
                     let t = eating_timer.ratio();
@@ -539,7 +539,7 @@ impl Grid {
 
     pub fn is_tile_lit(&self, pos: vec2<ICoord>, config: &Config) -> bool {
         self.all_tiles().any(|light| {
-            matches!(light.tile.kind, TileKind::Light(_))
+            matches!(light.tile.kind, TileKind::Light(true))
                 && logic::manhattan_distance(pos, light.pos) <= config.light_radius
         })
     }
