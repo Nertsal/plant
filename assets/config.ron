@@ -13,6 +13,8 @@ Config(
         KillBug: 5,
     },
 
+    bug_population: 15, // Max number of bugs on the map
+
     rock_frequency: 0.05,
     water_frequency: 0.02,
     water_lifetime: 30.0,

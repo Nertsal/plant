@@ -590,29 +590,38 @@ impl Model {
         }
 
         // Bug
-        let chance = self.config.bug_frequency * delta_time;
-        if rng.gen_bool(chance.as_f32().into()) {
-            // attempt to spawn
-            for _ in 0..10 {
-                let bounds = self.grid.bounds;
-                let pos = vec2(
-                    rng.gen_range(bounds.min.x..=bounds.max.x),
-                    rng.gen_range(bounds.min.y..=bounds.max.y),
-                );
-                if self.grid.get_tile(pos).is_none() && !self.grid.is_tile_lit(pos, &self.config) {
-                    self.grid.set_tile(
-                        pos,
-                        Tile::new(TileKind::Bug(Bug {
-                            id: self.next_id,
-                            state: BugState::Hungry {
-                                hunger: self.config.bug_hunger,
-                                eating_timer: Lifetime::new(self.config.bug_eat_time),
-                            },
-                            move_timer: self.config.bug_move_time,
-                        })),
+        let total_bugs = self
+            .grid
+            .all_tiles()
+            .filter(|tile| matches!(tile.tile.kind, TileKind::Bug(_)))
+            .count();
+        if total_bugs <= self.config.bug_population {
+            let chance = self.config.bug_frequency * delta_time;
+            if rng.gen_bool(chance.as_f32().into()) {
+                // attempt to spawn
+                for _ in 0..10 {
+                    let bounds = self.grid.bounds;
+                    let pos = vec2(
+                        rng.gen_range(bounds.min.x..=bounds.max.x),
+                        rng.gen_range(bounds.min.y..=bounds.max.y),
                     );
-                    self.next_id += 1;
-                    break;
+                    if self.grid.get_tile(pos).is_none()
+                        && !self.grid.is_tile_lit(pos, &self.config)
+                    {
+                        self.grid.set_tile(
+                            pos,
+                            Tile::new(TileKind::Bug(Bug {
+                                id: self.next_id,
+                                state: BugState::Hungry {
+                                    hunger: self.config.bug_hunger,
+                                    eating_timer: Lifetime::new(self.config.bug_eat_time),
+                                },
+                                move_timer: self.config.bug_move_time,
+                            })),
+                        );
+                        self.next_id += 1;
+                        break;
+                    }
                 }
             }
         }
