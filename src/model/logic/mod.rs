@@ -498,27 +498,10 @@ impl Model {
                 && leaf.kind == plant_kind
             {
                 // Check connectivity to root
-                // let mut rooted = false;
-                // let group = get_all_connected(&self.grid, tile.pos, |other| {
-                //     if other.tile.state.interactive()
-                //         && let TileKind::Seed(kind) = other.tile.kind
-                //         && kind == plant_kind
-                //     {
-                //         rooted = true;
-                //     }
-                //     if target != other.pos
-                //         && let TileKind::Leaf(other) = &other.tile.kind
-                //         && other.kind == leaf.kind
-                //     {
-                //         true
-                //     } else {
-                //         false
-                //     }
-                // });
-
                 let group = get_whole_plant(&self.grid, tile.pos);
                 let rooted = group.iter().any(|&pos| {
                     if let Some(tile) = self.grid.get_tile(pos)
+                        && tile.tile.state.interactive()
                         && let TileKind::Seed(seed) = tile.tile.kind
                     {
                         seed == plant_kind
