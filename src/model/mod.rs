@@ -231,6 +231,10 @@ impl Lifetime {
         }
     }
 
+    pub fn change(&mut self, delta: Time) {
+        self.remaining = (self.remaining + delta).clamp(Time::ZERO, self.max);
+    }
+
     pub fn ratio(&self) -> Time {
         if self.max == Time::ZERO {
             return Time::ZERO;

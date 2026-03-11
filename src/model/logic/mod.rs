@@ -23,14 +23,14 @@ impl Model {
 
             match &mut tile.tile.state {
                 TileState::Spawning(timer) | TileState::Transforming(timer) => {
-                    timer.remaining -= delta_time / self.config.animations.tile_spawn;
+                    timer.change(-delta_time / self.config.animations.tile_spawn);
                     if timer.remaining <= Time::ZERO {
                         tile.tile.state = TileState::Idle;
                     }
                     continue;
                 }
                 TileState::Moving { timer, delta } => {
-                    timer.remaining -= delta_time / self.config.animations.bug_move;
+                    timer.change(-delta_time / self.config.animations.bug_move);
                     let delta = *delta;
                     if timer.remaining <= Time::ZERO
                         && let Some(mut tile) = self.grid.remove_tile(pos)
@@ -42,7 +42,7 @@ impl Model {
                 }
                 TileState::Idle => {}
                 TileState::Despawning(timer) => {
-                    timer.remaining -= delta_time / self.config.animations.tile_despawn;
+                    timer.change(-delta_time / self.config.animations.tile_despawn);
                     if timer.remaining <= Time::ZERO {
                         self.grid.remove_tile(pos);
                     }
@@ -198,7 +198,7 @@ impl Model {
                     SoilState::Rich => {}
                 },
                 TileKind::Water(ref mut lifetime) => {
-                    lifetime.remaining -= delta_time;
+                    lifetime.change(-delta_time);
                     if lifetime.remaining <= Time::ZERO {
                         // Evaporate
                         tile.tile.state.despawn();
@@ -233,6 +233,13 @@ impl Model {
                             && let TileKind::Bug(bug) = &mut tile.tile.kind
                         {
                             bug.move_timer = self.config.bug_move_time;
+                            match &mut bug.state {
+                                BugState::Hungry { eating_timer, .. } => {
+                                    eating_timer.remaining = eating_timer.max
+                                }
+                                BugState::Pooping(lifetime) => lifetime.remaining = lifetime.max,
+                                BugState::Chilling { .. } => {}
+                            }
                             tile.tile.state.moving(dir);
                             grid.set_tile(
                                 pos + dir,
@@ -255,6 +262,7 @@ impl Model {
                                 .all_tiles()
                                 .filter(|tile| {
                                     if manhattan_distance(pos, tile.pos) <= 7
+                                        && tile.tile.state.interactive()
                                         && let TileKind::Leaf(_) = &tile.tile.kind
                                     {
                                         true
@@ -288,7 +296,7 @@ impl Model {
                                         hunger,
                                     } = &mut bug.state
                                 {
-                                    eating_timer.remaining -= delta_time;
+                                    eating_timer.change(-delta_time);
                                     if eating_timer.remaining <= Time::ZERO {
                                         *eating_timer = Lifetime::new(self.config.bug_eat_time);
                                         *hunger -= 1;
@@ -302,7 +310,7 @@ impl Model {
                             }
                         }
                         BugState::Pooping(timer) => {
-                            timer.remaining -= delta_time;
+                            timer.change(-delta_time);
                             if timer.remaining <= Time::ZERO {
                                 let target = self
                                     .grid
@@ -350,7 +358,7 @@ impl Model {
                     }
                 }
                 TileKind::Poop(ref mut lifetime) => {
-                    lifetime.remaining -= delta_time;
+                    lifetime.change(-delta_time);
                     if lifetime.remaining <= Time::ZERO {
                         tile.tile.state.despawn();
                     }
@@ -422,7 +430,7 @@ impl Model {
                     {
                         cutter.powered = powered;
                         if powered {
-                            cutter.cooldown.remaining -= delta_time;
+                            cutter.cooldown.change(-delta_time);
                             if cutter.cooldown.remaining <= Time::ZERO {
                                 // Cut down a nearby plant
                                 cutter.cooldown = Lifetime::new(self.config.cutter_cooldown);
