@@ -14,6 +14,8 @@ use crate::{
 const TILE_SIZE_PIXELS: vec2<usize> = vec2(32, 32);
 const QUEUED_ALPHA: f32 = 0.75;
 const HOVER_ALPHA: f32 = 0.5;
+const SHOP_TILE_LOCKED: f32 = 0.3;
+const SHOP_TILE_TOO_EXPENSIVE: f32 = 0.5;
 
 pub struct GameRender {
     pub context: Context,
@@ -558,11 +560,14 @@ impl GameRender {
                 // TODO: placeholder texture
                 continue;
             };
-            let color = if unlock_cost.is_some() {
-                Color::new(0.5, 0.5, 0.5, 1.0)
+            let m = if unlock_cost.is_some() {
+                SHOP_TILE_LOCKED
+            } else if model.config.get_cost(tile) > model.money {
+                SHOP_TILE_TOO_EXPENSIVE
             } else {
-                Color::WHITE
+                1.0
             };
+            let color = Color::new(m, m, m, 1.0);
             self.ui
                 .draw_texture(widget.position, texture, color, 1.0, framebuffer);
 
