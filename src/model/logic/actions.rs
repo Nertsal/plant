@@ -3,13 +3,19 @@ use super::*;
 impl Model {
     pub fn interact_with(&mut self, target: vec2<ICoord>) {
         log::debug!("interact with {}", target);
+        self.drone.target = self.tile_interaction(target);
+        self.context
+            .sfx
+            .play(&self.context.assets.sounds.drone_confirm);
+    }
+
+    pub fn tile_interaction(&self, target: vec2<ICoord>) -> DroneTarget {
         let Some(tile) = self.grid.get_tile(target) else {
             // Tell the drone to just fly to this tile
-            self.drone.target = DroneTarget::MoveTo(target);
-            return;
+            return DroneTarget::MoveTo(target);
         };
 
-        self.drone.target = match &tile.tile.kind {
+        match &tile.tile.kind {
             TileKind::Leaf(_) | TileKind::Seed(_) => {
                 DroneTarget::Interact(target, DroneAction::CutPlant)
             }
@@ -20,16 +26,12 @@ impl Model {
                     // self.context
                     //     .sfx
                     //     .play(&self.context.assets.sounds.drone_deny);
-                    self.drone.target = DroneTarget::MoveTo(target);
-                    return;
+                    return DroneTarget::MoveTo(target);
                 }
                 DroneTarget::Interact(target, DroneAction::Collect)
             }
             _ => DroneTarget::MoveTo(target),
-        };
-        self.context
-            .sfx
-            .play(&self.context.assets.sounds.drone_confirm);
+        }
     }
 
     pub fn place_tile(&mut self, target: vec2<ICoord>, tile: TileKind) -> bool {

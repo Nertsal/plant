@@ -35,12 +35,34 @@ pub enum DroneTarget {
     KillBug(Id),
 }
 
+impl DroneTarget {
+    pub fn name(&self) -> &'static str {
+        match self {
+            DroneTarget::MoveTo(_) => "",
+            DroneTarget::Interact(_, action) => action.name(),
+            DroneTarget::PlaceTile(..) | DroneTarget::BuyTile(..) => "Place",
+            DroneTarget::KillBug(_) => "Kill",
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Hash)]
 pub enum DroneAction {
     CutPlant,
     Collect,
     PlaceTile,
     KillBug,
+}
+
+impl DroneAction {
+    pub fn name(&self) -> &'static str {
+        match self {
+            DroneAction::CutPlant => "Harvest",
+            DroneAction::Collect => "Collect",
+            DroneAction::PlaceTile => "Place",
+            DroneAction::KillBug => "Kill",
+        }
+    }
 }
 
 #[derive(Debug)]

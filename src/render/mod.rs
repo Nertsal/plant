@@ -265,60 +265,79 @@ impl GameRender {
             );
         }
 
-        let tile_highlight = |pos: vec2<ICoord>,
-                              color: Color,
-                              framebuffer: &mut ugli::Framebuffer| {
-            let mut offset = vec2::ZERO;
-            if let Some(tile) = model.grid.get_tile(pos)
-                && let TileState::Moving { timer, delta } = &tile.tile.state
-            {
-                offset = movement_animation(&model.grid_visual, timer, *delta);
-            }
-
-            self.util.draw_on_tile_with(
-                &model.grid_visual,
-                pos,
-                color,
-                mat3::translate(offset),
-                &sprites.tile_select,
-                &model.camera,
-                framebuffer,
-            );
-            if let Some(tile) = model.grid.get_tile(pos)
-                && !matches!(tile.tile.kind, TileKind::GhostBlock(_))
-            {
-                let name = tile.tile.kind.name().to_uppercase();
-                let tile_bounds = model.grid_visual.tile_bounds(pos).as_f32();
-                let select_size = sprites.tile_select.size().as_f32() / TILE_SIZE_PIXELS.as_f32();
-                let select_bounds = tile_bounds.align_aabb(select_size, vec2(0.5, 0.5));
-                let position = select_bounds.align_pos(vec2(0.0, 1.0)) + vec2(0.1, 0.0) + offset;
-                self.util.draw_text(
-                    name,
-                    position,
-                    &assets.fonts.aseprite,
-                    TextRenderOptions::new(0.3)
-                        .align(vec2(0.0, 0.0))
-                        .color(palette.text),
+        let tile_highlight_with =
+            |name: &str,
+             offset: vec2<f32>,
+             pos: vec2<ICoord>,
+             color: Color,
+             framebuffer: &mut ugli::Framebuffer<'_>| {
+                self.util.draw_on_tile_with(
+                    &model.grid_visual,
+                    pos,
+                    color,
+                    mat3::translate(offset),
+                    &sprites.tile_select,
                     &model.camera,
                     framebuffer,
                 );
-            }
-        };
-        let ghost_tile =
-            |pos: vec2<ICoord>, tile: &TileKind, framebuffer: &mut ugli::Framebuffer<'_>| {
-                if model.grid.get_tile(pos).is_none()
-                    && let Some(texture) = sprites.tiles.get_texture(tile)
-                {
-                    self.util.draw_on_tile(
-                        &model.grid_visual,
-                        pos,
-                        Color::new(0.7, 0.7, 0.7, 0.5),
-                        texture,
+                if !name.is_empty() {
+                    let tile_bounds = model.grid_visual.tile_bounds(pos).as_f32();
+                    let select_size =
+                        sprites.tile_select.size().as_f32() / TILE_SIZE_PIXELS.as_f32();
+                    let select_bounds = tile_bounds.align_aabb(select_size, vec2(0.5, 0.5));
+                    let position =
+                        select_bounds.align_pos(vec2(0.0, 1.0)) + vec2(0.1, 0.0) + offset;
+                    self.util.draw_text(
+                        name,
+                        position,
+                        &assets.fonts.aseprite,
+                        TextRenderOptions::new(0.3)
+                            .align(vec2(0.0, 0.0))
+                            .color(palette.text),
                         &model.camera,
                         framebuffer,
                     );
                 }
             };
+        let tile_highlight =
+            |pos: vec2<ICoord>, color: Color, framebuffer: &mut ugli::Framebuffer| {
+                let mut offset = vec2::ZERO;
+                if let Some(tile) = model.grid.get_tile(pos)
+                    && let TileState::Moving { timer, delta } = &tile.tile.state
+                {
+                    offset = movement_animation(&model.grid_visual, timer, *delta);
+                }
+                if let Some(tile) = model.grid.get_tile(pos)
+                    && !matches!(tile.tile.kind, TileKind::GhostBlock(_))
+                {
+                    let name = model.tile_interaction(pos).name();
+                    tile_highlight_with(name, offset, pos, color, framebuffer);
+                }
+            };
+        let ghost_tile = |pos: vec2<ICoord>,
+                          tile: &TileKind,
+                          color: Color,
+                          framebuffer: &mut ugli::Framebuffer<'_>| {
+            if model.grid.get_tile(pos).is_none()
+                && let Some(texture) = sprites.tiles.get_texture(tile)
+            {
+                self.util.draw_on_tile(
+                    &model.grid_visual,
+                    pos,
+                    Color::new(0.7, 0.7, 0.7, 0.5),
+                    texture,
+                    &model.camera,
+                    framebuffer,
+                );
+                tile_highlight_with(
+                    DroneAction::PlaceTile.name(),
+                    vec2::ZERO,
+                    pos,
+                    color,
+                    framebuffer,
+                );
+            }
+        };
 
         let tile_description = |pos: vec2<ICoord>, framebuffer: &mut ugli::Framebuffer<'_>| {
             let Some(tile) = model.grid.get_tile(pos) else {
@@ -327,15 +346,26 @@ impl GameRender {
             if let TileKind::GhostBlock(_) = tile.tile.kind {
                 return;
             }
-            let text = tile.tile.kind.description();
-            if text.is_empty() {
-                return;
-            }
+            let text = format!(
+                "{}\n-----\n{}",
+                tile.tile.kind.name(),
+                tile.tile.kind.description()
+            );
+
+            let width = 6.0;
+            let font_size = 0.5;
+            let lines = crate::util::wrap_text(
+                &self.context.assets.fonts.aseprite,
+                &text,
+                width / font_size,
+            );
+
+            let height = font_size * 0.75 + font_size * lines.len() as f32;
 
             let pos = model.grid_visual.tile_bounds(pos).as_f32();
             let pos = Aabb2::point(pos.align_pos(vec2(0.0, 0.0)))
-                .extend_right(6.0)
-                .extend_down(2.2);
+                .extend_right(width)
+                .extend_down(height);
             self.util.draw_nine_slice(
                 pos,
                 Color::new(1.0, 1.0, 1.0, 0.8),
@@ -345,14 +375,8 @@ impl GameRender {
                 framebuffer,
             );
 
-            let size = 0.5;
             let pos = pos.extend_uniform(-0.1);
-            let lines = crate::util::wrap_text(
-                &self.context.assets.fonts.aseprite,
-                text,
-                pos.width() / size,
-            );
-            let row = pos.align_aabb(vec2(pos.width(), size), vec2(0.5, 1.0));
+            let row = pos.align_aabb(vec2(pos.width(), font_size), vec2(0.5, 1.0));
             let rows = row.stack(vec2(0.0, -row.height()), lines.len());
 
             for (line, position) in lines.into_iter().zip(rows) {
@@ -360,7 +384,7 @@ impl GameRender {
                     line,
                     position.align_pos(vec2(0.0, 0.5)),
                     &self.context.assets.fonts.aseprite,
-                    TextRenderOptions::new(size)
+                    TextRenderOptions::new(font_size)
                         .color(crate::util::with_alpha(palette.text, 1.0))
                         .align(vec2(0.0, 0.5)),
                     &model.camera,
@@ -376,7 +400,7 @@ impl GameRender {
                 tile_highlight(target, Color::WHITE, framebuffer);
             }
             DroneTarget::PlaceTile(target, ref tile) | DroneTarget::BuyTile(target, ref tile) => {
-                ghost_tile(target, tile, framebuffer);
+                ghost_tile(target, tile, Color::WHITE, framebuffer);
                 tile_highlight(target, Color::WHITE, framebuffer);
             }
             DroneTarget::KillBug(bug_id) => {
@@ -410,7 +434,7 @@ impl GameRender {
                     tile_description(target, framebuffer);
                 }
                 InputState::PlaceTile(tile) | InputState::BuyTile(tile) => {
-                    ghost_tile(target, tile, framebuffer);
+                    ghost_tile(target, tile, Color::new(0.7, 0.7, 0.7, 0.5), framebuffer);
                 }
             }
         }
