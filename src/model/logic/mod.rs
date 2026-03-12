@@ -242,7 +242,7 @@ impl Model {
                         vec2(0, delta.y.signum())
                     };
 
-                    if grid.get_tile(tile.pos + dir).is_none()
+                    if bug_can_move_into(grid, tile.pos + dir)
                         && let Some(tile) = grid.get_tile_mut(pos)
                         && let TileKind::Bug(bug) = &mut tile.tile.kind
                     {
@@ -290,7 +290,7 @@ impl Model {
                                 // Move in available random direction
                                 self.grid
                                     .get_neighbors_all(pos)
-                                    .filter(|tile| tile.tile.is_none())
+                                    .filter(|tile| bug_can_move_into(&self.grid, tile.pos))
                                     .map(|tile| tile.pos)
                                     .choose(&mut rng)
                             })
@@ -360,7 +360,7 @@ impl Model {
                             if let Some(target) = self
                                 .grid
                                 .get_neighbors_all(pos)
-                                .filter(|tile| tile.tile.is_none())
+                                .filter(|tile| bug_can_move_into(&self.grid, tile.pos))
                                 .map(|tile| tile.pos)
                                 .choose(&mut rng)
                             {
@@ -689,4 +689,9 @@ fn get_all_connected(
 
 pub fn manhattan_distance(a: vec2<ICoord>, b: vec2<ICoord>) -> ICoord {
     (a.x - b.x).abs() + (a.y - b.y).abs()
+}
+
+fn bug_can_move_into(grid: &Grid, pos: vec2<ICoord>) -> bool {
+    grid.get_tile(pos)
+        .is_none_or(|tile| matches!(tile.tile.kind, TileKind::Wire(_)))
 }
