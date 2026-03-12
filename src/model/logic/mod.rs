@@ -223,7 +223,7 @@ impl Model {
                             return;
                         }
                         let delta = target - pos;
-                        let dir = if delta.x.abs() >= delta.y.abs() {
+                        let dir = if delta.x.abs() > delta.y.abs() {
                             vec2(delta.x.signum(), 0)
                         } else {
                             vec2(0, delta.y.signum())
