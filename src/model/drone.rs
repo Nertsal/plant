@@ -43,6 +43,6 @@ impl DroneAction {
 pub struct Drone {
     pub position: vec2<FCoord>,
     pub velocity: vec2<FCoord>,
-    pub target: DroneTarget,
+    pub target: Option<DroneTarget>,
     pub action_progress: R32,
 }

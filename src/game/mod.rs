@@ -224,12 +224,10 @@ impl geng::State for GameState {
                         // Stop tile placement
                         self.input_state = InputState::Idle;
                     } else {
-                        // Stop drone action
-                        self.model.drone.target = DroneTarget::MoveTo(
-                            self.model
-                                .grid_visual
-                                .world_to_grid(self.model.drone.position),
-                        );
+                        // Cancel queued actions
+                        self.model.queued_actions.clear();
+                        // Cancel drone's current action
+                        self.model.drone.target = None;
                     }
                 }
             }

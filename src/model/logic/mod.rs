@@ -208,7 +208,7 @@ impl Model {
                 }
                 TileKind::Bug(ref mut bug) => {
                     if bug.move_timer > Time::ZERO {
-                        if let DroneTarget::KillBug(bug_id) = self.drone.target
+                        if let Some(DroneTarget::KillBug(bug_id)) = self.drone.target
                             && bug.id == bug_id
                             && self.drone.action_progress > R32::ZERO
                         {

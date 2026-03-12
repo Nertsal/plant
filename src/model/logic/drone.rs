@@ -2,33 +2,42 @@ use super::*;
 
 impl Model {
     pub fn update_drone(&mut self, delta_time: Time) {
+        // Update drone target
+        if self.drone.target.is_none() {
+            // Look for jobs
+            self.drone.target = self.queued_actions.pop_front();
+        }
+
         // Calculate drone's target position
-        let target_pos = match self.drone.target {
-            DroneTarget::MoveTo(pos)
-            | DroneTarget::Interact(pos, _)
-            | DroneTarget::PlaceTile(pos, _)
-            | DroneTarget::BuyTile(pos, _) => self.grid_visual.tile_bounds(pos).center(),
-            DroneTarget::KillBug(bug_id) => {
-                let bug = self.grid.tiles.iter().find(|(_, tile)| {
-                    if let TileKind::Bug(bug) = &tile.kind
-                        && bug.id == bug_id
-                    {
-                        true
-                    } else {
-                        false
-                    }
-                });
-                match bug {
-                    Some((&pos, _)) => self.grid_visual.tile_bounds(pos).center(),
-                    None => {
-                        self.drone.target = DroneTarget::MoveTo(
-                            self.grid_visual.world_to_grid(self.drone.position),
-                        );
-                        return;
+        let target_pos = match &self.drone.target {
+            None => self.drone.position,
+            Some(target) => match *target {
+                DroneTarget::MoveTo(pos)
+                | DroneTarget::Interact(pos, _)
+                | DroneTarget::PlaceTile(pos, _)
+                | DroneTarget::BuyTile(pos, _) => self.grid_visual.tile_bounds(pos).center(),
+                DroneTarget::KillBug(bug_id) => {
+                    let bug = self.grid.tiles.iter().find(|(_, tile)| {
+                        if let TileKind::Bug(bug) = &tile.kind
+                            && bug.id == bug_id
+                        {
+                            true
+                        } else {
+                            false
+                        }
+                    });
+                    match bug {
+                        Some((&pos, _)) => self.grid_visual.tile_bounds(pos).center(),
+                        None => {
+                            self.drone.target = None;
+                            return;
+                        }
                     }
                 }
-            }
+            },
         };
+
+        // Go towards target position
         let reach = self.config.drone_reach;
         let offset = (self.drone.position - target_pos).clamp_len(..=reach);
         let target_pos = target_pos + offset;
@@ -73,14 +82,19 @@ impl Model {
     }
 
     pub fn drone_action(&mut self, delta_time: Time) {
-        match self.drone.target.clone() {
-            DroneTarget::MoveTo(_) => {}
+        let Some(target) = self.drone.target.clone() else {
+            return;
+        };
+        match target {
+            DroneTarget::MoveTo(_) => {
+                // Stop once reached
+                self.drone.target = None;
+            }
             DroneTarget::Interact(position, action) => {
                 self.drone.action_progress += delta_time / self.config.action_duration[&action];
                 if self.drone.action_progress >= R32::ONE {
                     self.drone.action_progress = R32::ZERO;
-                    self.drone.target =
-                        DroneTarget::MoveTo(self.grid_visual.world_to_grid(self.drone.position));
+                    self.drone.target = None;
                     match action {
                         DroneAction::CutPlant => {
                             self.cut_plant_tile(position, true);
@@ -97,8 +111,7 @@ impl Model {
                     delta_time / self.config.action_duration[&DroneAction::KillBug];
                 if self.drone.action_progress >= R32::ONE {
                     self.drone.action_progress = R32::ZERO;
-                    self.drone.target =
-                        DroneTarget::MoveTo(self.grid_visual.world_to_grid(self.drone.position));
+                    self.drone.target = None;
                     let bug = self.grid.tiles.iter().find(|(_, tile)| {
                         if let TileKind::Bug(bug) = &tile.kind
                             && bug.id == bug_id
@@ -121,8 +134,7 @@ impl Model {
                     delta_time / self.config.action_duration[&DroneAction::PlaceTile];
                 if self.drone.action_progress >= R32::ONE {
                     self.drone.action_progress = R32::ZERO;
-                    self.drone.target =
-                        DroneTarget::MoveTo(self.grid_visual.world_to_grid(self.drone.position));
+                    self.drone.target = None;
                     if self.grid.get_tile(position).is_none()
                         && let Some((inv_item_idx, (_, count))) = self
                             .inventory
@@ -144,8 +156,7 @@ impl Model {
                     delta_time / self.config.action_duration[&DroneAction::PlaceTile];
                 if self.drone.action_progress >= R32::ONE {
                     self.drone.action_progress = R32::ZERO;
-                    self.drone.target =
-                        DroneTarget::MoveTo(self.grid_visual.world_to_grid(self.drone.position));
+                    self.drone.target = None;
                     let cost = self.config.get_cost(&tile);
                     if self.grid.get_tile(position).is_none() && self.money >= cost {
                         self.grid.set_tile(position, Tile::new(tile.clone()));

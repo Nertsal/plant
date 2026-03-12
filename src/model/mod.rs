@@ -28,6 +28,7 @@ pub struct Model {
     pub grid: Grid,
     pub money: Money,
     pub drone: Drone,
+    pub queued_actions: VecDeque<DroneTarget>,
     pub inventory: Vec<(TileKind, usize)>,
 }
 
@@ -52,9 +53,10 @@ impl Model {
             drone: Drone {
                 position: vec2::ZERO,
                 velocity: vec2::ZERO,
-                target: DroneTarget::MoveTo(vec2::ZERO),
+                target: None,
                 action_progress: R32::ZERO,
             },
+            queued_actions: VecDeque::new(),
             inventory: vec![(TileKind::Seed(Seed::new(PlantKind::TypeA)), 1)],
 
             config,

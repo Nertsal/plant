@@ -1,5 +1,7 @@
 pub use crate::{assets::*, context::*};
 
+pub use std::collections::VecDeque;
+
 pub use anyhow::Result;
 pub use geng::prelude::*;
 pub use geng_utils::{bounded::Bounded, conversions::*};

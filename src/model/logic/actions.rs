@@ -3,7 +3,7 @@ use super::*;
 impl Model {
     pub fn interact_with(&mut self, target: vec2<ICoord>) {
         log::debug!("interact with {}", target);
-        self.drone.target = self.tile_interaction(target);
+        self.queued_actions.push_back(self.tile_interaction(target));
         self.context
             .sfx
             .play(&self.context.assets.sounds.drone_confirm);
@@ -40,7 +40,8 @@ impl Model {
             return false;
         }
 
-        self.drone.target = DroneTarget::PlaceTile(target, tile);
+        self.queued_actions
+            .push_back(DroneTarget::PlaceTile(target, tile));
         self.context
             .sfx
             .play(&self.context.assets.sounds.drone_confirm);
@@ -59,7 +60,8 @@ impl Model {
             return false;
         }
 
-        self.drone.target = DroneTarget::BuyTile(target, tile);
+        self.queued_actions
+            .push_back(DroneTarget::BuyTile(target, tile));
         self.context
             .sfx
             .play(&self.context.assets.sounds.drone_confirm);

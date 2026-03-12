@@ -12,6 +12,8 @@ use crate::{
 
 /// Full size of a single tile in pixels, used for scaling textures to properly fit on the tile.
 const TILE_SIZE_PIXELS: vec2<usize> = vec2(32, 32);
+const QUEUED_ALPHA: f32 = 0.75;
+const HOVER_ALPHA: f32 = 0.5;
 
 pub struct GameRender {
     pub context: Context,
@@ -324,7 +326,7 @@ impl GameRender {
                 self.util.draw_on_tile(
                     &model.grid_visual,
                     pos,
-                    Color::new(0.7, 0.7, 0.7, 0.5),
+                    Color::new(0.7, 0.7, 0.7, HOVER_ALPHA),
                     texture,
                     &model.camera,
                     framebuffer,
@@ -393,28 +395,42 @@ impl GameRender {
             }
         };
 
-        // Drone action
-        match model.drone.target {
-            DroneTarget::MoveTo(_) => {}
-            DroneTarget::Interact(target, _) => {
-                tile_highlight(target, Color::WHITE, framebuffer);
-            }
-            DroneTarget::PlaceTile(target, ref tile) | DroneTarget::BuyTile(target, ref tile) => {
-                ghost_tile(target, tile, Color::WHITE, framebuffer);
-                tile_highlight(target, Color::WHITE, framebuffer);
-            }
-            DroneTarget::KillBug(bug_id) => {
-                let bug = model.grid.tiles.iter().find(|(_, tile)| {
-                    if let TileKind::Bug(bug) = &tile.kind
-                        && bug.id == bug_id
-                    {
-                        true
-                    } else {
-                        false
+        // Drone and Queued actions
+        for (target, alpha) in itertools::chain![
+            model.drone.target.as_ref().map(|target| (target, 1.0)),
+            model
+                .queued_actions
+                .iter()
+                .map(|action| (action, QUEUED_ALPHA))
+        ] {
+            let white = crate::util::with_alpha(Color::WHITE, alpha);
+            match *target {
+                DroneTarget::MoveTo(_) => {}
+                DroneTarget::Interact(target, _) => {
+                    tile_highlight(target, white, framebuffer);
+                }
+                DroneTarget::PlaceTile(target, ref tile)
+                | DroneTarget::BuyTile(target, ref tile) => {
+                    ghost_tile(target, tile, white, framebuffer);
+                    tile_highlight(target, white, framebuffer);
+                }
+                DroneTarget::KillBug(bug_id) => {
+                    let bug = model.grid.tiles.iter().find(|(_, tile)| {
+                        if let TileKind::Bug(bug) = &tile.kind
+                            && bug.id == bug_id
+                        {
+                            true
+                        } else {
+                            false
+                        }
+                    });
+                    if let Some((&target, _)) = bug {
+                        tile_highlight(
+                            target,
+                            crate::util::with_alpha(Color::RED, alpha),
+                            framebuffer,
+                        );
                     }
-                });
-                if let Some((&target, _)) = bug {
-                    tile_highlight(target, Color::RED, framebuffer);
                 }
             }
         }
