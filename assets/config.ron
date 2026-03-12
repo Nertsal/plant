@@ -7,17 +7,17 @@ Config(
     seed_grow_only_up: true,
 
     action_duration: {
-        CutPlant: 5.0,
+        CutPlant: 3.0,
         Collect: 1.0,
         PlaceTile: 0.5,
-        KillBug: 5,
+        KillBug: 3,
     },
 
     bug_population: 15, // Max number of bugs on the map
 
     rock_frequency: 0.05,
-    water_frequency: 0.02,
-    water_lifetime: 30.0,
+    water_frequency: 0.04,
+    water_lifetime: 10.0,
     poop_lifetime: 30.0,
 
     bug_frequency: 0.05,
@@ -28,9 +28,9 @@ Config(
     bug_move_time: 5.0,
 
     light_radius: 8,
-    drainer_radius: 4,
+    drainer_radius: 5,
     cutter_radius: 1,
-    cutter_cooldown: 60,
+    cutter_cooldown: 30,
 
     animations: (
         tile_spawn: 0.75,
@@ -128,12 +128,12 @@ Config(
         ),
         (
             price: 50,
-            unlocked_at: 30,
+            unlocked_at: 50,
             tile: Light(false),
         ),
         (
-            price: 300,
-            unlocked_at: 400,
+            price: 100,
+            unlocked_at: 100,
             tile: Drainer,
         ),
         (
@@ -143,12 +143,12 @@ Config(
         ),
         (
             price: 160,
-            unlocked_at: 200,
+            unlocked_at: 160,
             tile: Cutter(()),
         ),
         (
             price: 50,
-            unlocked_at: 400,
+            unlocked_at: 300,
             tile: Pipe(false),
         ),
         (
