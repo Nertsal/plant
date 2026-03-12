@@ -381,4 +381,14 @@ impl TileKind {
             _ => None,
         }
     }
+
+    pub fn action_range(&self, config: &Config) -> Option<ICoord> {
+        match self {
+            TileKind::Light(_) => Some(config.light_radius),
+            TileKind::Drainer => Some(config.drainer_radius),
+            TileKind::Cutter(_) => Some(config.cutter_radius),
+            TileKind::Sprinkler(_) => Some(1),
+            _ => None,
+        }
+    }
 }

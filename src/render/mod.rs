@@ -17,12 +17,14 @@ const HOVER_ALPHA: f32 = 0.5;
 const SHOP_TILE_LOCKED: f32 = 0.3;
 const SHOP_TILE_TOO_EXPENSIVE: f32 = 0.5;
 const HOVER_ANIMATION_TIME: f32 = 0.5;
+const HIGHLIGHT_TRANSITION: f32 = 0.25;
 
 pub struct GameRender {
     pub context: Context,
     pub util: UtilRender,
     pub ui: UiRender,
     pub active_highlight: (vec2<ICoord>, Time),
+    pub place_highlight: Option<(TileKind, Time)>,
     pub hover_animation: Vec<(vec2<ICoord>, Time)>,
 }
 
@@ -32,6 +34,7 @@ impl GameRender {
             util: UtilRender::new(context.clone()),
             ui: UiRender::new(context.clone()),
             active_highlight: (vec2::ZERO, Time::ZERO),
+            place_highlight: None,
             hover_animation: Vec::new(),
             context,
         }
@@ -78,41 +81,88 @@ impl GameRender {
         self.hover_animation
             .retain(|(p, time)| *time < Time::ONE || Some(*p) == cursor.grid_pos);
 
+        // Update hovered timing
         if Some(self.active_highlight.0) != cursor.grid_pos {
-            self.active_highlight.1 -= delta_time / r32(0.25);
+            self.active_highlight.1 -= delta_time / r32(HIGHLIGHT_TRANSITION);
             if self.active_highlight.1 <= Time::ZERO
                 && let Some(grid_pos) = cursor.grid_pos
             {
                 self.active_highlight.0 = grid_pos;
             }
         } else {
-            self.active_highlight.1 += delta_time / r32(0.25);
+            self.active_highlight.1 += delta_time / r32(HIGHLIGHT_TRANSITION);
         }
         self.active_highlight.1 = self.active_highlight.1.clamp(Time::ZERO, Time::ONE);
 
-        let highlight_range = model
-            .grid
-            .get_tile(self.active_highlight.0)
-            .and_then(|tile| {
-                let range = match tile.tile.kind {
-                    TileKind::Light(_) => Some(assets.config.light_radius),
-                    TileKind::Drainer => Some(assets.config.drainer_radius),
-                    TileKind::Cutter(_) => Some(assets.config.cutter_radius),
-                    TileKind::Sprinkler(_) => Some(1),
-                    _ => None,
-                };
-                range.map(|range| (self.active_highlight.0, range))
-            });
+        // Update placement timing
+        if let InputState::PlaceTile(tile) | InputState::BuyTile(tile) = input_state {
+            // Go up
+            if let Some((kind, t)) = &mut self.place_highlight {
+                if kind.name() == tile.name() {
+                    *t += delta_time / r32(HIGHLIGHT_TRANSITION);
+                } else {
+                    *t -= delta_time / r32(HIGHLIGHT_TRANSITION);
+                    if t.as_f32() <= 0.0 {
+                        *kind = tile.clone();
+                    }
+                }
+                *t = (*t).clamp(R32::ZERO, R32::ONE);
+            } else {
+                self.place_highlight = Some((tile.clone(), Time::ZERO));
+            }
+        } else if let Some((_, t)) = &mut self.place_highlight {
+            // Go down
+            *t -= delta_time / r32(HIGHLIGHT_TRANSITION);
+            if t.as_f32() <= 0.0 {
+                self.place_highlight = None;
+            }
+        }
+        let mut highlight_t = self.active_highlight.1;
+        let highlighted_tile = if let Some((tile, t)) = &self.place_highlight {
+            // Highlight placement
+            highlight_t = *t;
+            Some((tile, cursor.grid_pos))
+        } else {
+            // Highlight hovered
+            model
+                .grid
+                .get_tile(self.active_highlight.0)
+                .map(|tile| (&tile.tile.kind, Some(self.active_highlight.0)))
+        };
+        let highlight_range = highlighted_tile.and_then(|(tile, pos)| {
+            pos.and_then(|pos| {
+                let range = tile.action_range(&model.config);
+                range.map(|range| (pos, range, 1.0))
+            })
+        });
+        let highlight_range: Vec<_> = itertools::chain![
+            highlight_range,
+            model.grid.all_tiles().filter_map(|tile| {
+                if Some(tile.tile.kind.name()) == highlighted_tile.map(|(tile, _)| tile.name())
+                    && let Some(range) = tile.tile.kind.action_range(&model.config)
+                {
+                    Some((tile.pos, range, 0.5))
+                } else {
+                    None
+                }
+            })
+        ]
+        .collect();
 
         // Grid
         for x in model.grid.bounds.min.x..=model.grid.bounds.max.x {
             for y in model.grid.bounds.min.y..=model.grid.bounds.max.y {
                 let pos = vec2(x, y);
-                let highlight =
-                    highlight_range.is_some_and(|(p, r)| logic::manhattan_distance(pos, p) <= r);
+                let highlight = highlight_range
+                    .iter()
+                    .filter_map(|&(p, r, a)| {
+                        let d = logic::manhattan_distance(pos, p);
+                        (d <= r).then_some(r32(a))
+                    })
+                    .max();
                 let texture = &sprites.tile;
-                let color = if highlight {
-                    let t = self.active_highlight.1.as_f32() * 0.2;
+                let color = if let Some(a) = highlight {
+                    let t = highlight_t.as_f32() * 0.2 * a.as_f32();
                     Color::new(1.0 + t, 1.0 + t, 1.0 + t, 1.0)
                 } else {
                     Color::WHITE
@@ -138,7 +188,7 @@ impl GameRender {
             let Some(texture) = sprites.tiles.get_texture(&tile.tile.kind) else {
                 continue;
             };
-            let mult = match tile.tile.kind {
+            let mut mult = match tile.tile.kind {
                 TileKind::Light(connected)
                 | TileKind::Wire(connected)
                 | TileKind::Cutter(Cutter {
@@ -156,7 +206,6 @@ impl GameRender {
                 _ => 1.0,
             };
 
-            let color = Color::new(mult, mult, mult, 1.0);
             let mut transform = mat3::identity();
             match &tile.tile.state {
                 TileState::Spawning(timer) => {
@@ -196,6 +245,12 @@ impl GameRender {
                     }
                 }
             }
+
+            if Some(tile.tile.kind.name()) == highlighted_tile.map(|(tile, _)| tile.name()) {
+                // Highlight tiles of the same type
+                mult *= 1.0 + self.active_highlight.1.as_f32() * 0.1;
+            }
+            let color = Color::new(mult, mult, mult, 1.0);
             self.util.draw_on_tile_with(
                 &model.grid_visual,
                 pos,
