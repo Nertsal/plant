@@ -463,7 +463,7 @@ impl GameRender {
         };
 
         // Drone and Queued actions
-        for (target, alpha) in itertools::chain![
+        for (action, alpha) in itertools::chain![
             model.drone.target.as_ref().map(|target| (target, 1.0)),
             model
                 .queued_actions
@@ -471,15 +471,15 @@ impl GameRender {
                 .map(|action| (action, QUEUED_ALPHA))
         ] {
             let white = crate::util::with_alpha(Color::WHITE, alpha);
-            match *target {
+            match *action {
                 DroneTarget::MoveTo(_) => {}
                 DroneTarget::Interact(target, _) => {
-                    tile_highlight(target, white, framebuffer);
+                    tile_highlight_with(action.name(), vec2::ZERO, target, white, framebuffer);
                 }
                 DroneTarget::PlaceTile(target, ref tile)
                 | DroneTarget::BuyTile(target, ref tile) => {
                     ghost_tile(target, tile, white, framebuffer);
-                    tile_highlight(target, white, framebuffer);
+                    tile_highlight_with(action.name(), vec2::ZERO, target, white, framebuffer);
                 }
                 DroneTarget::KillBug(bug_id) => {
                     let bug = model.grid.tiles.iter().find(|(_, tile)| {
@@ -492,7 +492,9 @@ impl GameRender {
                         }
                     });
                     if let Some((&target, _)) = bug {
-                        tile_highlight(
+                        tile_highlight_with(
+                            action.name(),
+                            vec2::ZERO,
                             target,
                             crate::util::with_alpha(Color::RED, alpha),
                             framebuffer,

@@ -2,6 +2,16 @@ use super::*;
 
 impl Model {
     pub fn interact_with(&mut self, target: vec2<ICoord>) {
+        if itertools::chain![&self.drone.target, &self.queued_actions].any(|action| match action {
+            DroneTarget::Interact(pos, _)
+            | DroneTarget::PlaceTile(pos, _)
+            | DroneTarget::BuyTile(pos, _) => *pos == target,
+            DroneTarget::MoveTo(_) | DroneTarget::KillBug(_) => false,
+        }) {
+            // Cannot interact with ghosts
+            return;
+        }
+
         log::debug!("interact with {}", target);
         let interaction = self.tile_interaction(target);
         if let DroneTarget::MoveTo(_) = interaction {
@@ -68,6 +78,14 @@ impl Model {
     }
 
     pub fn place_tile(&mut self, target: vec2<ICoord>, tile: TileKind) -> bool {
+        if itertools::chain![&self.drone.target, &self.queued_actions].any(|action| match action {
+            DroneTarget::PlaceTile(pos, _) | DroneTarget::BuyTile(pos, _) => *pos == target,
+            DroneTarget::Interact(..) | DroneTarget::MoveTo(_) | DroneTarget::KillBug(_) => false,
+        }) {
+            // Cannot place on top of ghosts
+            return false;
+        }
+
         log::debug!("place tile at {}: {:?}", target, tile);
         if self.grid.get_tile(target).is_some() || !self.inventory.iter().any(|(t, _)| *t == tile) {
             return false;
@@ -97,6 +115,14 @@ impl Model {
     }
 
     pub fn buy_tile(&mut self, target: vec2<ICoord>, tile: TileKind) -> bool {
+        if itertools::chain![&self.drone.target, &self.queued_actions].any(|action| match action {
+            DroneTarget::PlaceTile(pos, _) | DroneTarget::BuyTile(pos, _) => *pos == target,
+            DroneTarget::Interact(..) | DroneTarget::MoveTo(_) | DroneTarget::KillBug(_) => false,
+        }) {
+            // Cannot place on top of ghosts
+            return false;
+        }
+
         log::debug!("buy tile at {}: {:?}", target, tile);
         if self.grid.get_tile(target).is_some() {
             return false;

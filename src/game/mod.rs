@@ -69,7 +69,8 @@ impl GameState {
         game
     }
 
-    fn left_click(&mut self) {
+    /// Called every frame that the LMB is held down.
+    fn lmb_down(&mut self) {
         if self.ui.inventory.hovered || self.ui.shop.hovered {
             // Focus UI first
             return;
@@ -128,13 +129,15 @@ impl geng::State for GameState {
         self.delta_time = delta_time;
         self.real_time += delta_time;
 
+        let geng = self.context.geng.clone();
+        let window = geng.window();
+        if window.is_button_pressed(geng::MouseButton::Left) {
+            self.lmb_down();
+        }
+
         if cfg!(feature = "cheats")
-            && self.context.geng.window().is_key_pressed(geng::Key::T)
-            && self
-                .context
-                .geng
-                .window()
-                .is_key_pressed(geng::Key::ShiftLeft)
+            && window.is_key_pressed(geng::Key::T)
+            && window.is_key_pressed(geng::Key::ShiftLeft)
         {
             delta_time *= r32(20.0);
         }
@@ -206,11 +209,6 @@ impl geng::State for GameState {
                     .as_r32();
                 let grid_pos = self.model.grid_visual.world_to_grid(self.cursor.world_pos);
                 self.cursor.grid_pos = self.model.grid.in_bounds(grid_pos).then_some(grid_pos);
-            }
-            geng::Event::MousePress {
-                button: geng::MouseButton::Left,
-            } => {
-                self.left_click();
             }
             geng::Event::MousePress {
                 button: geng::MouseButton::Middle | geng::MouseButton::Right,
