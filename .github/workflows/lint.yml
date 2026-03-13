@@ -1,0 +1,27 @@
+name: Lint
+on:
+  push:
+
+permissions:
+  contents: read
+  checks: write
+
+jobs:
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    container: ghcr.io/geng-engine/cargo-geng@sha256:0e57d6ddd0b82f845fc254a553d2259d21f43ae7bc2068490db6659c8ed30fbe
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+      - uses: Swatinem/rust-cache@v2
+      - name: Format
+        uses: actions-rs/cargo@v1
+        with:
+          command: fmt
+          args: --check
+      - name: Clippy
+        uses: actions-rs/clippy-check@v1
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          args: --workspace --all-features
