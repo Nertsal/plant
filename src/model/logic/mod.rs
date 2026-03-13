@@ -96,11 +96,7 @@ impl Model {
             TileKind::Seed(ref seed) => {
                 let plant_kind = seed.kind;
                 let config = &self.config.plants[&plant_kind];
-                let grow_direction = if self.config.seed_grow_only_up {
-                    vec![vec2(0, -1)]
-                } else {
-                    Connections::NEIGHBORS.to_vec()
-                };
+                let grow_direction = seed_grow_direction(self.config.seed_grow_only_up);
 
                 // Current energy of the seed
                 let seed_energy = seed.total_energy();
@@ -108,7 +104,7 @@ impl Model {
                 // Grow from Soil
                 let grow_from = grow_direction
                     .iter()
-                    .filter_map(|delta| self.grid.get_tile(pos + *delta))
+                    .filter_map(|delta| self.grid.get_tile(pos - *delta))
                     .filter(|tile| tile.tile.state.interactive())
                     .find_map(|neighbor| {
                         let mut kind = neighbor.tile.kind.clone();
@@ -144,7 +140,7 @@ impl Model {
                     }
                 } else if seed_energy >= R32::ONE
                     && !grow_direction.iter().any(|delta| {
-                        if let Some(tile) = self.grid.get_tile(pos - *delta)
+                        if let Some(tile) = self.grid.get_tile(pos + *delta)
                             && let TileKind::Leaf(leaf) = &tile.tile.kind
                         {
                             leaf.kind == plant_kind
@@ -154,7 +150,7 @@ impl Model {
                     })
                     && let Some(empty) = grow_direction
                         .iter()
-                        .map(|delta| pos - *delta)
+                        .map(|delta| pos + *delta)
                         .filter(|&pos| plants::can_grow_into(pos, &self.grid))
                         .choose(&mut rng)
                 {
@@ -533,7 +529,7 @@ impl Model {
                 && leaf.kind == plant_kind
             {
                 // Check connectivity to root
-                let group = get_whole_plant(&self.grid, tile.pos);
+                let group = get_whole_plant(&self.grid, tile.pos, &self.config);
                 let rooted = group.iter().any(|&pos| {
                     if let Some(tile) = self.grid.get_tile(pos)
                         && tile.tile.state.alive()
@@ -655,25 +651,39 @@ impl Model {
     }
 }
 
-pub fn get_whole_plant(grid: &Grid, start: vec2<ICoord>) -> Vec<vec2<ICoord>> {
+pub fn get_whole_plant(grid: &Grid, start: vec2<ICoord>, config: &Config) -> Vec<vec2<ICoord>> {
     let mut connected = vec![start];
     let mut to_check = vec![start];
     while let Some(pos) = to_check.pop() {
         if let Some(tile) = grid.get_tile(pos)
             && tile.tile.state.alive()
-            && let TileKind::Leaf(leaf) = &tile.tile.kind
         {
-            let connections: Vec<_> = leaf
-                .connections
-                .get_connections(tile.pos)
-                .map(|other| other.pos)
+            let (plant_kind, connections) = match &tile.tile.kind {
+                TileKind::Leaf(leaf) => (
+                    leaf.kind,
+                    leaf.connections
+                        .get_connections(tile.pos)
+                        .map(|other| other.pos)
+                        .collect::<Vec<_>>(),
+                ),
+                TileKind::Seed(seed) => (
+                    seed.kind,
+                    seed_grow_direction(config.seed_grow_only_up)
+                        .into_iter()
+                        .map(|delta| pos + delta)
+                        .collect(),
+                ),
+                _ => continue,
+            };
+            let connections: Vec<_> = connections
+                .into_iter()
                 .filter(|&other| {
                     !connected.contains(&other)
                         && grid
                             .get_tile(other)
                             .is_some_and(|other| match &other.tile.kind {
-                                TileKind::Leaf(other) => other.kind == leaf.kind,
-                                TileKind::Seed(seed) => seed.kind == leaf.kind,
+                                TileKind::Leaf(other) => other.kind == plant_kind,
+                                TileKind::Seed(seed) => seed.kind == plant_kind,
                                 _ => false,
                             })
                 })
@@ -716,4 +726,12 @@ pub fn manhattan_distance(a: vec2<ICoord>, b: vec2<ICoord>) -> ICoord {
 fn bug_can_move_into(grid: &Grid, pos: vec2<ICoord>) -> bool {
     grid.get_tile(pos)
         .is_none_or(|tile| matches!(tile.tile.kind, TileKind::Wire(_)))
+}
+
+fn seed_grow_direction(only_up: bool) -> Vec<vec2<ICoord>> {
+    if only_up {
+        vec![vec2(0, 1)]
+    } else {
+        Connections::NEIGHBORS.to_vec()
+    }
 }

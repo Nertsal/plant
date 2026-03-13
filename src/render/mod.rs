@@ -12,18 +12,33 @@ use crate::{
 
 /// Full size of a single tile in pixels, used for scaling textures to properly fit on the tile.
 const TILE_SIZE_PIXELS: vec2<usize> = vec2(32, 32);
+/// Transparency of the queued tile action.
 const QUEUED_ALPHA: f32 = 0.75;
+/// Transparency of the previewed action.
 const HOVER_ALPHA: f32 = 0.5;
+
+/// Brightness of locked shop items.
 const SHOP_TILE_LOCKED: f32 = 0.3;
+/// Brightness of unlocked, but unaffordable shop items.
 const SHOP_TILE_TOO_EXPENSIVE: f32 = 0.5;
+
+/// Duration of the tile hover squish animation.
 const HOVER_ANIMATION_TIME: f32 = 0.5;
+/// Duration of the hover highlight transition.
 const HIGHLIGHT_TRANSITION: f32 = 0.25;
+/// Extra brightness of the higlighted tiles.
+const HOVER_HIGHLIGHT: f32 = 0.15;
+/// Speed of the hover highlighting blinking.
+const HOVER_BLINK_SPEED: f32 = 4.0;
+/// Relative brightness of the higlighted range for the tiles that match the hovered one.
+const OTHER_RANGE_HIGHLIGHT: f32 = 0.4;
 
 pub struct GameRender {
     pub context: Context,
     pub util: UtilRender,
     pub ui: UiRender,
-    pub active_highlight: (vec2<ICoord>, Time),
+    /// (position, animation (0..1), real time passed)
+    pub active_highlight: (vec2<ICoord>, Time, Time),
     pub place_highlight: Option<(TileKind, Time)>,
     pub hover_animation: Vec<(vec2<ICoord>, Time)>,
 }
@@ -33,7 +48,7 @@ impl GameRender {
         Self {
             util: UtilRender::new(context.clone()),
             ui: UiRender::new(context.clone()),
-            active_highlight: (vec2::ZERO, Time::ZERO),
+            active_highlight: (vec2::ZERO, Time::ZERO, Time::ZERO),
             place_highlight: None,
             hover_animation: Vec::new(),
             context,
@@ -88,9 +103,11 @@ impl GameRender {
                 && let Some(grid_pos) = cursor.grid_pos
             {
                 self.active_highlight.0 = grid_pos;
+                self.active_highlight.2 = Time::ZERO; // Reset timer
             }
         } else {
             self.active_highlight.1 += delta_time / r32(HIGHLIGHT_TRANSITION);
+            self.active_highlight.2 += delta_time;
         }
         self.active_highlight.1 = self.active_highlight.1.clamp(Time::ZERO, Time::ONE);
 
@@ -134,7 +151,7 @@ impl GameRender {
         let highlighted_tiles = if let Some((kind, Some(pos))) = highlighted_tile
             && let TileKind::Leaf(_) | TileKind::Seed(_) = kind
         {
-            logic::get_whole_plant(&model.grid, pos)
+            logic::get_whole_plant(&model.grid, pos, &model.config)
         } else {
             vec![]
         };
@@ -152,7 +169,7 @@ impl GameRender {
                 if Some(tile.tile.kind.name()) == highlighted_tile.map(|(tile, _)| tile.name())
                     && let Some(range) = tile.tile.kind.action_range(&model.config)
                 {
-                    Some((tile.pos, range, 0.4))
+                    Some((tile.pos, range, OTHER_RANGE_HIGHLIGHT))
                 } else {
                     None
                 }
@@ -259,7 +276,13 @@ impl GameRender {
 
             if highlighted_tiles.contains(&pos) {
                 // Highlight tiles of the same type
-                mult *= 1.0 + self.active_highlight.1.as_f32() * 0.1;
+                let t = (self.active_highlight.2.as_f32()
+                    * std::f32::consts::FRAC_PI_2
+                    * HOVER_BLINK_SPEED)
+                    .sin()
+                    * 0.5
+                    + 0.5;
+                mult *= 1.0 + self.active_highlight.1.as_f32() * t * HOVER_HIGHLIGHT;
             }
             let color = Color::new(mult, mult, mult, 1.0);
             self.util.draw_on_tile_with(

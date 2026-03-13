@@ -45,7 +45,7 @@ impl Model {
         let plant_config = &self.config.plants[&leaf.kind];
 
         // Check plant size
-        let whole_plant = get_whole_plant(&self.grid, plant.pos);
+        let whole_plant = get_whole_plant(&self.grid, plant.pos, &self.config);
         let plant_size = whole_plant.len();
         let plant_seed = whole_plant.into_iter().find_map(|pos| {
             if let Some(tile) = self.grid.get_tile(pos)
