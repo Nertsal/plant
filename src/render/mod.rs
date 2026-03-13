@@ -117,6 +117,8 @@ impl GameRender {
                 self.place_highlight = None;
             }
         }
+
+        // Tile highlight
         let mut highlight_t = self.active_highlight.1;
         let highlighted_tile = if let Some((tile, t)) = &self.place_highlight {
             // Highlight placement
@@ -129,6 +131,15 @@ impl GameRender {
                 .get_tile(self.active_highlight.0)
                 .map(|tile| (&tile.tile.kind, Some(self.active_highlight.0)))
         };
+        let highlighted_tiles = if let Some((kind, Some(pos))) = highlighted_tile
+            && let TileKind::Leaf(_) | TileKind::Seed(_) = kind
+        {
+            logic::get_whole_plant(&model.grid, pos)
+        } else {
+            vec![]
+        };
+
+        // Highlight empty tiles to visualize action range
         let highlight_range = highlighted_tile.and_then(|(tile, pos)| {
             pos.and_then(|pos| {
                 let range = tile.action_range(&model.config);
@@ -246,7 +257,7 @@ impl GameRender {
                 }
             }
 
-            if Some(tile.tile.kind.name()) == highlighted_tile.map(|(tile, _)| tile.name()) {
+            if highlighted_tiles.contains(&pos) {
                 // Highlight tiles of the same type
                 mult *= 1.0 + self.active_highlight.1.as_f32() * 0.1;
             }

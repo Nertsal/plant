@@ -655,7 +655,7 @@ impl Model {
     }
 }
 
-fn get_whole_plant(grid: &Grid, start: vec2<ICoord>) -> Vec<vec2<ICoord>> {
+pub fn get_whole_plant(grid: &Grid, start: vec2<ICoord>) -> Vec<vec2<ICoord>> {
     let mut connected = vec![start];
     let mut to_check = vec![start];
     while let Some(pos) = to_check.pop() {
