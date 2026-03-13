@@ -141,7 +141,7 @@ impl GameRender {
                 if Some(tile.tile.kind.name()) == highlighted_tile.map(|(tile, _)| tile.name())
                     && let Some(range) = tile.tile.kind.action_range(&model.config)
                 {
-                    Some((tile.pos, range, 0.5))
+                    Some((tile.pos, range, 0.4))
                 } else {
                     None
                 }
