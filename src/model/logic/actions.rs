@@ -3,10 +3,26 @@ use super::*;
 impl Model {
     pub fn interact_with(&mut self, target: vec2<ICoord>) {
         log::debug!("interact with {}", target);
-        self.queued_actions.push_back(self.tile_interaction(target));
-        self.context
-            .sfx
-            .play(&self.context.assets.sounds.drone_confirm);
+        let interaction = self.tile_interaction(target);
+        if let DroneTarget::MoveTo(_) = interaction {
+            // Tell the closest unoccupied drone to move here
+            if self
+                .drone
+                .target
+                .as_ref()
+                .is_none_or(|target| matches!(target, DroneTarget::MoveTo(_)))
+            {
+                self.drone.target = Some(interaction);
+                self.context
+                    .sfx
+                    .play(&self.context.assets.sounds.drone_confirm);
+            }
+        } else {
+            self.queued_actions.push_back(interaction);
+            self.context
+                .sfx
+                .play(&self.context.assets.sounds.drone_confirm);
+        }
     }
 
     pub fn tile_interaction(&self, target: vec2<ICoord>) -> DroneTarget {
