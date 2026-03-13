@@ -422,21 +422,23 @@ impl GameRender {
                     );
                 }
             };
-        let tile_highlight =
-            |pos: vec2<ICoord>, color: Color, framebuffer: &mut ugli::Framebuffer| {
-                let mut offset = vec2::ZERO;
-                if let Some(tile) = model.grid.get_tile(pos)
-                    && let TileState::Moving { timer, delta } = &tile.tile.state
-                {
-                    offset = movement_animation(&model.grid_visual, timer, *delta);
-                }
-                if let Some(tile) = model.grid.get_tile(pos)
-                    && !matches!(tile.tile.kind, TileKind::GhostBlock(_))
-                {
-                    let name = model.tile_interaction(pos).name();
-                    tile_highlight_with(name, offset, pos, color, framebuffer);
-                }
-            };
+        let tile_highlight = |name: Option<&str>,
+                              pos: vec2<ICoord>,
+                              color: Color,
+                              framebuffer: &mut ugli::Framebuffer| {
+            let mut offset = vec2::ZERO;
+            if let Some(tile) = model.grid.get_tile(pos)
+                && let TileState::Moving { timer, delta } = &tile.tile.state
+            {
+                offset = movement_animation(&model.grid_visual, timer, *delta);
+            }
+            if let Some(tile) = model.grid.get_tile(pos)
+                && !matches!(tile.tile.kind, TileKind::GhostBlock(_))
+            {
+                let name = name.unwrap_or_else(|| model.tile_interaction(pos).name());
+                tile_highlight_with(name, offset, pos, color, framebuffer);
+            }
+        };
         let ghost_tile = |pos: vec2<ICoord>,
                           tile: &TileKind,
                           color: Color,
@@ -452,13 +454,7 @@ impl GameRender {
                     &model.camera,
                     framebuffer,
                 );
-                tile_highlight_with(
-                    DroneAction::PlaceTile.name(),
-                    vec2::ZERO,
-                    pos,
-                    color,
-                    framebuffer,
-                );
+                tile_highlight(Some(DroneAction::PlaceTile.name()), pos, color, framebuffer);
             }
         };
 
@@ -474,12 +470,12 @@ impl GameRender {
             match *action {
                 DroneTarget::MoveTo(_) => {}
                 DroneTarget::Interact(target, _) => {
-                    tile_highlight_with(action.name(), vec2::ZERO, target, white, framebuffer);
+                    tile_highlight(Some(action.name()), target, white, framebuffer);
                 }
                 DroneTarget::PlaceTile(target, ref tile)
                 | DroneTarget::BuyTile(target, ref tile) => {
                     ghost_tile(target, tile, white, framebuffer);
-                    tile_highlight_with(action.name(), vec2::ZERO, target, white, framebuffer);
+                    tile_highlight(Some(action.name()), target, white, framebuffer);
                 }
                 DroneTarget::KillBug(bug_id) => {
                     let bug = model.grid.tiles.iter().find(|(_, tile)| {
@@ -492,9 +488,8 @@ impl GameRender {
                         }
                     });
                     if let Some((&target, _)) = bug {
-                        tile_highlight_with(
-                            action.name(),
-                            vec2::ZERO,
+                        tile_highlight(
+                            Some(action.name()),
                             target,
                             crate::util::with_alpha(Color::RED, alpha),
                             framebuffer,
@@ -515,7 +510,7 @@ impl GameRender {
                     } else {
                         Color::new(0.7, 0.7, 0.7, 0.5)
                     };
-                    tile_highlight(target, color, framebuffer);
+                    tile_highlight(None, target, color, framebuffer);
                     if let Some(tile) = model.grid.get_tile(target) {
                         let pos = model
                             .grid_visual
