@@ -2,12 +2,7 @@ use super::*;
 
 impl Model {
     pub fn interact_with(&mut self, target: vec2<ICoord>) {
-        if itertools::chain![&self.drone.target, &self.queued_actions].any(|action| match action {
-            DroneTarget::Interact(pos, _)
-            | DroneTarget::PlaceTile(pos, _)
-            | DroneTarget::BuyTile(pos, _) => *pos == target,
-            DroneTarget::MoveTo(_) | DroneTarget::KillBug(_) => false,
-        }) {
+        if self.active_action_at(target).is_some() {
             // Cannot interact with ghosts
             return;
         }
@@ -23,9 +18,6 @@ impl Model {
                 .is_none_or(|target| matches!(target, DroneTarget::MoveTo(_)))
             {
                 self.drone.target = Some(interaction);
-                self.context
-                    .sfx
-                    .play(&self.context.assets.sounds.drone_confirm);
             }
         } else {
             self.queued_actions.push_back(interaction);
@@ -78,10 +70,7 @@ impl Model {
     }
 
     pub fn place_tile(&mut self, target: vec2<ICoord>, tile: TileKind) -> bool {
-        if itertools::chain![&self.drone.target, &self.queued_actions].any(|action| match action {
-            DroneTarget::PlaceTile(pos, _) | DroneTarget::BuyTile(pos, _) => *pos == target,
-            DroneTarget::Interact(..) | DroneTarget::MoveTo(_) | DroneTarget::KillBug(_) => false,
-        }) {
+        if self.active_action_at(target).is_some() {
             // Cannot place on top of ghosts
             return false;
         }
@@ -115,10 +104,7 @@ impl Model {
     }
 
     pub fn buy_tile(&mut self, target: vec2<ICoord>, tile: TileKind) -> bool {
-        if itertools::chain![&self.drone.target, &self.queued_actions].any(|action| match action {
-            DroneTarget::PlaceTile(pos, _) | DroneTarget::BuyTile(pos, _) => *pos == target,
-            DroneTarget::Interact(..) | DroneTarget::MoveTo(_) | DroneTarget::KillBug(_) => false,
-        }) {
+        if self.active_action_at(target).is_some() {
             // Cannot place on top of ghosts
             return false;
         }

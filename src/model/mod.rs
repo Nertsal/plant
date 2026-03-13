@@ -15,6 +15,11 @@ pub type Id = usize;
 
 pub const INVENTORY_MAX_SIZE: usize = 10;
 
+pub enum ActionId {
+    Drone,
+    Queued(usize),
+}
+
 pub struct Model {
     pub context: Context,
     pub camera: Camera2d,

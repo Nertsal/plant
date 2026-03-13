@@ -96,6 +96,28 @@ impl GameState {
             }
         }
     }
+
+    fn cancel(&mut self) {
+        if !matches!(self.input_state, InputState::Idle) {
+            // Stop tile placement
+            self.input_state = InputState::Idle;
+            return;
+        }
+
+        let Some(target) = self.cursor.grid_pos else {
+            return;
+        };
+
+        // Cancel hovered action
+        if let Some((i, _)) = self.model.active_action_at(target) {
+            match i {
+                ActionId::Drone => self.model.drone.target = None,
+                ActionId::Queued(i) => {
+                    self.model.queued_actions.remove(i);
+                }
+            }
+        }
+    }
 }
 
 impl geng::State for GameState {
@@ -227,15 +249,7 @@ impl geng::State for GameState {
                     && (self.real_time - drag.from_real_time).as_f32() < 0.5
                 {
                     // Short right click - cancel action
-                    if !matches!(self.input_state, InputState::Idle) {
-                        // Stop tile placement
-                        self.input_state = InputState::Idle;
-                    } else {
-                        // Cancel queued actions
-                        self.model.queued_actions.clear();
-                        // Cancel drone's current action
-                        self.model.drone.target = None;
-                    }
+                    self.cancel();
                 }
             }
             _ => {}

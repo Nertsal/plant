@@ -662,6 +662,33 @@ impl Model {
             }
         }
     }
+
+    pub fn active_action_at(&mut self, target: vec2<ICoord>) -> Option<(ActionId, &DroneTarget)> {
+        let mut actions = itertools::chain![
+            self.drone
+                .target
+                .iter()
+                .map(|action| (ActionId::Drone, action)),
+            self.queued_actions
+                .iter()
+                .enumerate()
+                .map(|(i, action)| (ActionId::Queued(i), action))
+        ];
+
+        actions.find(|(_, action)| match **action {
+            DroneTarget::Interact(pos, _)
+            | DroneTarget::PlaceTile(pos, _)
+            | DroneTarget::BuyTile(pos, _) => pos == target,
+            DroneTarget::KillBug(id) => self.grid.get_tile(target).is_some_and(|tile| {
+                if let TileKind::Bug(bug) = &tile.tile.kind {
+                    bug.id == id
+                } else {
+                    false
+                }
+            }),
+            DroneTarget::MoveTo(_) => false,
+        })
+    }
 }
 
 pub fn get_whole_plant(grid: &Grid, start: vec2<ICoord>, config: &Config) -> Vec<vec2<ICoord>> {
