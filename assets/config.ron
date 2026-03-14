@@ -29,8 +29,7 @@ Config(
 
     light_radius: 8,
     drainer_radius: 5,
-    cutter_radius: 1,
-    cutter_cooldown: 30,
+    cutter_cut_time: 3.0,
 
     animations: (
         tile_spawn: 0.75,

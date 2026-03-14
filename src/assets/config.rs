@@ -30,8 +30,7 @@ pub struct Config {
 
     pub light_radius: ICoord,
     pub drainer_radius: ICoord,
-    pub cutter_radius: ICoord,
-    pub cutter_cooldown: Time,
+    pub cutter_cut_time: Time,
 
     pub plants: HashMap<PlantKind, ConfigPlant>,
     pub shop: Vec<ConfigShopItem>,

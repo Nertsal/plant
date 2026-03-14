@@ -469,30 +469,32 @@ impl Model {
                     }
                     tile.tile.state.alive() && tile.tile.kind.transmits_power()
                 });
+                let plants: Vec<_> = self
+                    .grid
+                    .get_neighbors(pos)
+                    .filter(|tile| {
+                        matches!(tile.tile.kind, TileKind::Leaf(_)) && tile.tile.state.alive()
+                    })
+                    .map(|tile| tile.pos)
+                    .collect();
+
                 if let Some(tile) = self.grid.get_tile_mut(pos)
                     && let TileKind::Cutter(cutter) = &mut tile.tile.kind
                 {
                     cutter.powered = powered;
-                    if powered {
-                        cutter.cooldown.change(-delta_time);
-                        if cutter.cooldown.remaining <= Time::ZERO {
+                    if powered && !plants.is_empty() {
+                        cutter
+                            .cut_timer
+                            .change(-delta_time / self.config.cutter_cut_time);
+                        if cutter.cut_timer.remaining <= Time::ZERO {
                             // Cut down a nearby plant
-                            cutter.cooldown = Lifetime::new(self.config.cutter_cooldown);
-                            let plants: Vec<_> = self
-                                .grid
-                                .all_tiles()
-                                .filter(|tile| {
-                                    manhattan_distance(pos, tile.pos) <= self.config.cutter_radius
-                                        && matches!(tile.tile.kind, TileKind::Leaf(_))
-                                })
-                                .map(|tile| tile.pos)
-                                .collect();
+                            cutter.cut_timer.remaining = cutter.cut_timer.max;
                             for plant in plants {
                                 self.cut_plant_tile(plant, true);
                             }
                         }
                     } else {
-                        cutter.cooldown.remaining = cutter.cooldown.max;
+                        cutter.cut_timer.remaining = cutter.cut_timer.max;
                     }
                 }
             }

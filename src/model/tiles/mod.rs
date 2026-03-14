@@ -126,14 +126,14 @@ pub enum BugState {
 #[serde(default)]
 pub struct Cutter {
     pub powered: bool,
-    pub cooldown: Lifetime,
+    pub cut_timer: Lifetime,
 }
 
 impl Default for Cutter {
     fn default() -> Self {
         Self {
             powered: false,
-            cooldown: Lifetime::new(R32::ONE),
+            cut_timer: Lifetime::new(R32::ONE),
         }
     }
 }
@@ -362,9 +362,11 @@ impl TileKind {
                 .map(|t| Time::ONE - t)
                 .filter(|&t| t > Time::ZERO),
             TileKind::Water(lifetime) | TileKind::Poop(lifetime) => {
-                Some(lifetime.ratio()).filter(|&t| t < R32::ONE)
+                Some(lifetime.ratio()).filter(|&t| t < Time::ONE)
             }
-            TileKind::Cutter(cutter) => Some(cutter.cooldown.ratio()).filter(|&t| t < R32::ONE),
+            TileKind::Cutter(cutter) => {
+                Some(Time::ONE - cutter.cut_timer.ratio()).filter(|&t| t > Time::ZERO)
+            }
             TileKind::Bug(bug) => match &bug.state {
                 BugState::Hungry { eating_timer, .. } => {
                     let t = eating_timer.ratio();
@@ -390,7 +392,7 @@ impl TileKind {
         match self {
             TileKind::Light(_) => Some(config.light_radius),
             TileKind::Drainer => Some(config.drainer_radius),
-            TileKind::Cutter(_) => Some(config.cutter_radius),
+            TileKind::Cutter(_) => Some(1),
             TileKind::Sprinkler(_) => Some(1),
             _ => None,
         }
