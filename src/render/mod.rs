@@ -112,8 +112,10 @@ impl GameRender {
         self.active_highlight.1 = self.active_highlight.1.clamp(Time::ZERO, Time::ONE);
 
         // Update placement timing
-        if let InputState::PlaceTile(tile) | InputState::BuyTile(tile) = input_state {
-            // Go up
+        if let InputState::PlaceTile(tile) | InputState::BuyTile(tile) = input_state
+            && tile.action_range(&model.config).is_some()
+        {
+            // Timer go up
             if let Some((kind, t)) = &mut self.place_highlight {
                 if kind.name() == tile.name() {
                     *t += delta_time / r32(HIGHLIGHT_TRANSITION);
@@ -128,7 +130,7 @@ impl GameRender {
                 self.place_highlight = Some((tile.clone(), Time::ZERO));
             }
         } else if let Some((_, t)) = &mut self.place_highlight {
-            // Go down
+            // Timer go down
             *t -= delta_time / r32(HIGHLIGHT_TRANSITION);
             if t.as_f32() <= 0.0 {
                 self.place_highlight = None;
