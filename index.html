@@ -101,7 +101,7 @@
     </div>
     <script src="sound-fix.js"></script>
     <script type="module">
-        import init from "./plant.js";
+        import init from "./plantile.js";
 
         function updateBodySize() {
             // For the rare legacy browsers that don't support it
@@ -160,7 +160,7 @@
             progressText.innerText = width;
         };
 
-        init(load_wasm("plant.wasm", window.gengUpdateProgress));
+        init(load_wasm("plantile.wasm", window.gengUpdateProgress));
     </script>
 </body>
 

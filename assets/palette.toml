@@ -1,3 +1,7 @@
 background = "#31315B"
 text = "#F2FBF4"
 gold = "#F1D605"
+progress_background = "#212545"
+progress = "#F2FBF4"
+connection_plant = "#477C3F"
+connection_power = "#5B3F82"
