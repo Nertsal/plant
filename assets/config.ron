@@ -4,17 +4,21 @@ Config(
     drone_max_speed: 20.0,
     drone_reach: 0.5,
 
+    seed_grow_only_up: true,
+
     action_duration: {
         CutPlant: 3.0,
-        Collect: 2.0,
-        PlaceTile: 2.0,
-        KillBug: 2.5,
+        Collect: 1.0,
+        PlaceTile: 0.5,
+        KillBug: 3,
     },
 
+    bug_population: 15, // Max number of bugs on the map
+
     rock_frequency: 0.05,
-    water_frequency: 0.08,
+    water_frequency: 0.04,
     water_lifetime: 10.0,
-    poop_lifetime: 10.0,
+    poop_lifetime: 30.0,
 
     bug_frequency: 0.05,
     bug_hunger: 5,
@@ -23,35 +27,80 @@ Config(
     bug_chill_time: 10.0,
     bug_move_time: 5.0,
 
-    light_radius: 11,
-    drainer_radius: 4,
-    cutter_radius: 1,
-    cutter_cooldown: 60,
+    light_radius: 8,
+    drainer_radius: 5,
+    cutter_cut_time: 3.0,
+
+    animations: (
+        tile_spawn: 0.75,
+        tile_despawn: 1.2,
+        bug_move: 0.4,
+    ),
 
     plants: {
         TypeA: (
             growth_time: 3.0,
             growth_time_dark: 10.0,
-            max_size: 15,
+            max_size: 10,
             price: 3,
+            growth_capacity: 20, // How many leaves grow when fully charged from soil before needing recharge
+            soils: {
+                Soil(Dry): (
+                    growth_speed: 1.0, // Growth speed multiplier
+                    capacity: 10, // How many leaves grow from a single soil
+                ),
+                Soil(Watered): (
+                    growth_speed: 1.5,
+                    capacity: 10,
+                ),
+                Soil(Rich): (
+                    growth_speed: 2.0,
+                    capacity: 10,
+                ),
+            },
         ),
         TypeB: (
-            growth_time: 5.0,
-            growth_time_dark: 12.0,
-            max_size: 15,
+            growth_time: 8.0,
+            growth_time_dark: 16.0,
+            max_size: 8,
             price: 10,
+            growth_capacity: 16,
+            soils: {
+                Soil(Watered): (
+                    growth_speed: 1.0,
+                    capacity: 8,
+                ),
+                Soil(Rich): (
+                    growth_speed: 2.0,
+                    capacity: 8,
+                ),
+            },
         ),
         TypeC: (
             growth_time: 15.0,
             growth_time_dark: 35.0,
             max_size: 6,
             price: 50,
+            growth_capacity: 18,
+            soils: {
+                Water(()): (
+                    growth_speed: 1.0,
+                    capacity: 6,
+                ),
+            },
         ),
         TypeD: (
             growth_time: 10.0,
             growth_time_dark: 25.0,
             max_size: 25,
             price: 30,
+            growth_capacity: 50,
+            soils: {
+                Soil(Rich): (
+                    growth_speed: 1.0,
+                    capacity: 25,
+                ),
+            },
         ),
     },
 
@@ -67,7 +116,7 @@ Config(
             tile: Wire(false),
         ),
         (
-            price: 30,
+            price: 20,
             unlocked_at: 0,
             tile: Soil(Dry),
         ),
@@ -78,12 +127,12 @@ Config(
         ),
         (
             price: 50,
-            unlocked_at: 30,
+            unlocked_at: 50,
             tile: Light(false),
         ),
         (
-            price: 300,
-            unlocked_at: 400,
+            price: 100,
+            unlocked_at: 100,
             tile: Drainer,
         ),
         (
@@ -93,12 +142,12 @@ Config(
         ),
         (
             price: 160,
-            unlocked_at: 200,
+            unlocked_at: 160,
             tile: Cutter(()),
         ),
         (
             price: 50,
-            unlocked_at: 400,
+            unlocked_at: 300,
             tile: Pipe(false),
         ),
         (
@@ -107,13 +156,13 @@ Config(
             tile: Seed(TypeD),
         ),
         (
-            price: 3000,
-            unlocked_at: 5000,
+            price: 1500,
+            unlocked_at: 1500,
             tile: Power,
         ),
         (
-            price: 1000,
-            unlocked_at: 1000,
+            price: 600,
+            unlocked_at: 600,
             tile: Sprinkler(false),
         ),
     ],

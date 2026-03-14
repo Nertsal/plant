@@ -11,6 +11,22 @@ pub fn smoothstep<T: Float>(t: T) -> T {
     T::from_f32(3.0) * t * t - T::from_f32(2.0) * t * t * t
 }
 
+pub fn ease_out_elastic_with<T: Float>(t: T, frequency: T, damping: T) -> T {
+    let t = t.as_f32();
+    let freq = frequency.as_f32();
+    let damp = damping.as_f32();
+    if t <= 0.0 {
+        T::ZERO
+    } else if t >= 1.0 {
+        T::ONE
+    } else {
+        T::from_f32(
+            (-10.0 * t).exp2() * ((t - 1.0 / 4.0 / freq) * std::f32::consts::TAU * freq).sin()
+                + 1.0,
+        )
+    }
+}
+
 /// Returns the given color with the multiplied alpha.
 pub fn with_alpha(mut color: Rgba<f32>, alpha: f32) -> Rgba<f32> {
     color.a *= alpha;

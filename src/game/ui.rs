@@ -14,7 +14,7 @@ pub struct GameUI {
 
     pub shop: WidgetState,
     pub shop_hover_t: f32,
-    pub shop_items: Vec<(WidgetState, Tile)>,
+    pub shop_items: Vec<(WidgetState, TileKind)>,
 
     pub gold: WidgetState,
 }
@@ -24,7 +24,7 @@ impl GameUI {
         let shop = &context.assets.config.shop;
         Self {
             inventory: WidgetState::new(),
-            inventory_items: vec![WidgetState::new().with_sfx(WidgetSfxConfig::hover_left()); 6],
+            inventory_items: vec![],
 
             shop: WidgetState::new(),
             shop_hover_t: 0.0,
@@ -42,18 +42,27 @@ impl GameUI {
         }
     }
 
-    pub fn layout(&mut self, screen: Aabb2<f32>, context: &mut UiContext) {
+    pub fn layout(&mut self, model: &Model, screen: Aabb2<f32>, context: &mut UiContext) {
         // let layout_size = screen.height() * 0.05;
         let pixel_scale = get_pixel_scale(screen.size().map(|x| x as usize));
 
         // Inventory
         let inventory = screen
-            .align_aabb(vec2(342.0, 45.0) * pixel_scale, vec2(0.5, 0.0))
+            .align_aabb(vec2(346.0, 45.0) * pixel_scale, vec2(0.5, 0.0))
             .map(|x| x.round());
         self.inventory
             .update(inventory.extend_down(pixel_scale * 3.0), context);
 
         // Items
+        if self.inventory_items.len() < model.inventory.len() {
+            self.inventory_items.extend(
+                (self.inventory_items.len()..model.inventory.len())
+                    .map(|_| WidgetState::new().with_sfx(WidgetSfxConfig::hover_left())),
+            );
+        } else {
+            self.inventory_items
+                .drain(model.inventory.len()..self.inventory_items.len());
+        }
         let items = inventory.extend_uniform(-6.0 * pixel_scale);
         let item = items.align_aabb(vec2(28.0, 34.0) * pixel_scale, vec2(0.0, 0.5));
         let items = item.stack(vec2(34.0, 0.0) * pixel_scale, self.inventory_items.len());

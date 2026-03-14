@@ -1,6 +1,7 @@
+mod config;
 mod font;
 
-pub use self::font::*;
+pub use self::{config::*, font::*};
 
 use crate::{model::*, prelude::Color};
 
@@ -8,62 +9,6 @@ use std::path::PathBuf;
 
 use geng::prelude::*;
 use geng_utils::gif::GifFrame;
-
-#[derive(geng::asset::Load, Serialize, Deserialize, Debug, Clone)]
-#[load(serde = "ron")]
-pub struct Config {
-    pub drone_acceleration: R32,
-    pub drone_deceleration: R32,
-    pub drone_max_speed: R32,
-    pub drone_reach: R32,
-
-    pub action_duration: HashMap<DroneAction, Time>,
-
-    pub rock_frequency: R32,
-    pub water_frequency: R32,
-    pub water_lifetime: Time,
-    pub poop_lifetime: Time,
-
-    pub bug_frequency: R32,
-    pub bug_hunger: usize,
-    pub bug_eat_time: Time,
-    pub bug_poop_time: Time,
-    pub bug_chill_time: Time,
-    pub bug_move_time: Time,
-
-    pub light_radius: ICoord,
-    pub drainer_radius: ICoord,
-    pub cutter_radius: ICoord,
-    pub cutter_cooldown: Time,
-
-    pub plants: HashMap<PlantKind, ConfigPlant>,
-    pub shop: Vec<ConfigShopItem>,
-}
-
-#[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct ConfigPlant {
-    pub growth_time: Time,
-    pub growth_time_dark: Time,
-    pub max_size: usize,
-    pub price: Money,
-}
-
-#[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct ConfigShopItem {
-    pub price: Money,
-    pub unlocked_at: Money,
-    pub tile: Tile,
-}
-
-impl Config {
-    pub fn get_cost(&self, tile: &Tile) -> Money {
-        self.shop
-            .iter()
-            .find(|item| item.tile == *tile)
-            .map(|item| item.price)
-            .unwrap_or(0)
-    }
-}
 
 #[derive(geng::asset::Load)]
 pub struct Assets {
@@ -119,6 +64,10 @@ pub struct Palette {
     pub background: Color,
     pub text: Color,
     pub gold: Color,
+    pub progress_background: Color,
+    pub progress: Color,
+    pub connection_plant: Color,
+    pub connection_power: Color,
 }
 
 #[derive(geng::asset::Load)]
@@ -127,6 +76,8 @@ pub struct Sprites {
     pub tile_select: PixelTexture,
     pub tile: PixelTexture,
     pub tiles: SpritesTiles,
+    pub tile_connector_horizontal: PixelTexture,
+    pub tile_connector_vertical: PixelTexture,
 
     pub ui_window: PixelTexture,
     // pub ui_window_shop: PixelTexture,
@@ -159,36 +110,37 @@ pub struct SpritesTiles {
 }
 
 impl SpritesTiles {
-    pub fn get_texture(&self, tile: &Tile) -> &PixelTexture {
+    pub fn get_texture(&self, tile: &TileKind) -> Option<&PixelTexture> {
         match tile {
-            Tile::Leaf(leaf) => match leaf.kind {
-                PlantKind::TypeA => &self.plant_a,
-                PlantKind::TypeB => &self.plant_b,
-                PlantKind::TypeC => &self.plant_c,
-                PlantKind::TypeD => &self.plant_d,
+            TileKind::GhostBlock(_) => None,
+            TileKind::Leaf(leaf) => match leaf.kind {
+                PlantKind::TypeA => Some(&self.plant_a),
+                PlantKind::TypeB => Some(&self.plant_b),
+                PlantKind::TypeC => Some(&self.plant_c),
+                PlantKind::TypeD => Some(&self.plant_d),
             },
-            Tile::Seed(kind) => match kind {
-                PlantKind::TypeA => &self.seed_a,
-                PlantKind::TypeB => &self.seed_b,
-                PlantKind::TypeC => &self.seed_c,
-                PlantKind::TypeD => &self.seed_d,
+            TileKind::Seed(seed) => match seed.kind {
+                PlantKind::TypeA => Some(&self.seed_a),
+                PlantKind::TypeB => Some(&self.seed_b),
+                PlantKind::TypeC => Some(&self.seed_c),
+                PlantKind::TypeD => Some(&self.seed_d),
             },
-            Tile::Light(_) => &self.light,
-            Tile::Soil(state) => match state {
-                SoilState::Dry => &self.soil_dry,
-                SoilState::Watered => &self.soil,
-                SoilState::Rich => &self.soil_rich,
+            TileKind::Light(_) => Some(&self.light),
+            TileKind::Soil(state) => match state {
+                SoilState::Dry => Some(&self.soil_dry),
+                SoilState::Watered => Some(&self.soil),
+                SoilState::Rich => Some(&self.soil_rich),
             },
-            Tile::Water(_) => &self.water,
-            Tile::Bug(_) => &self.bug,
-            Tile::Poop(_) => &self.poop,
-            Tile::Power => &self.power,
-            Tile::Wire(_) => &self.wire,
-            Tile::Drainer => &self.drain,
-            Tile::Cutter(_) => &self.cutter,
-            Tile::Pipe(_) => &self.pipe,
-            Tile::Sprinkler(_) => &self.sprinkler,
-            Tile::Rock => &self.rock,
+            TileKind::Water(_) => Some(&self.water),
+            TileKind::Bug(_) => Some(&self.bug),
+            TileKind::Poop(_) => Some(&self.poop),
+            TileKind::Power => Some(&self.power),
+            TileKind::Wire(_) => Some(&self.wire),
+            TileKind::Drainer => Some(&self.drain),
+            TileKind::Cutter(_) => Some(&self.cutter),
+            TileKind::Pipe(_) => Some(&self.pipe),
+            TileKind::Sprinkler(_) => Some(&self.sprinkler),
+            TileKind::Rock => Some(&self.rock),
         }
     }
 }

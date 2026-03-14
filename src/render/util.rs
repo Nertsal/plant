@@ -157,35 +157,50 @@ impl UtilRender {
         &self,
         grid: &GridVisual,
         pos: vec2<ICoord>,
+        color: Color,
         texture: &ugli::Texture,
         camera: &impl geng::AbstractCamera2d,
         framebuffer: &mut ugli::Framebuffer,
     ) {
-        self.draw_on_tile_with(grid, pos, Color::WHITE, texture, camera, framebuffer)
+        self.draw_on_tile_with(
+            grid,
+            pos,
+            color,
+            mat3::identity(),
+            texture,
+            camera,
+            framebuffer,
+        )
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub fn draw_on_tile_with(
         &self,
         grid: &GridVisual,
         pos: vec2<ICoord>,
         color: Color,
+        transform: mat3<f32>,
         texture: &ugli::Texture,
         camera: &impl geng::AbstractCamera2d,
         framebuffer: &mut ugli::Framebuffer,
     ) {
         let tile_bounds = grid.tile_bounds(pos).as_f32();
         let size = texture.size().as_f32() / TILE_SIZE_PIXELS.as_f32();
-        let quad = tile_bounds.align_aabb(size, vec2(0.5, 0.5));
-        self.context
-            .geng
-            .draw2d()
-            .textured_quad(framebuffer, camera, quad, texture, color);
+        let quad = Aabb2::ZERO.extend_symmetric(size / 2.0);
+        let center = tile_bounds.align_aabb(size, vec2(0.5, 0.5)).center();
+        self.context.geng.draw2d().draw2d(
+            framebuffer,
+            camera,
+            &draw2d::TexturedQuad::colored(quad, texture, color)
+                .transform(mat3::translate(center) * transform),
+        );
     }
 
     pub fn draw_texture_autoscaled(
         &self,
         pos: vec2<FCoord>,
         angle: Angle,
+        color: Color,
         texture: &ugli::Texture,
         camera: &impl geng::AbstractCamera2d,
         framebuffer: &mut ugli::Framebuffer,
@@ -195,7 +210,7 @@ impl UtilRender {
         self.context.geng.draw2d().draw2d(
             framebuffer,
             camera,
-            &draw2d::TexturedQuad::new(quad, texture)
+            &draw2d::TexturedQuad::colored(quad, texture, color)
                 .transform(mat3::translate(pos.as_f32()) * mat3::rotate(angle)),
         );
     }

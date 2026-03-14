@@ -5,25 +5,97 @@ const SPLIT_CHANCE: f32 = 0.1;
 impl Model {
     pub fn update_plant(&mut self, position: vec2<ICoord>, delta_time: Time) {
         let is_lit = self.grid.is_tile_lit(position, &self.config);
-        let Some(mut plant) = self.grid.get_tile_mut(position) else {
-            return;
-        };
-        let Tile::Leaf(leaf) = &mut plant.tile else {
-            return;
-        };
+
+        macro_rules! let_leaf {
+            (let $plant:ident, $leaf:ident) => {
+                let Some($plant) = self.grid.get_tile(position) else {
+                    return;
+                };
+                let TileKind::Leaf($leaf) = &$plant.tile.kind else {
+                    return;
+                };
+            };
+            (let mut $plant:ident, $leaf:ident) => {
+                let Some($plant) = self.grid.get_tile_mut(position) else {
+                    return;
+                };
+                let TileKind::Leaf($leaf) = &mut $plant.tile.kind else {
+                    return;
+                };
+            };
+        }
+
+        // Update connections
+        let_leaf!(let plant, leaf);
+        let mut connections = leaf.connections.clone();
+        for delta in Connections::NEIGHBORS {
+            if connections.get(delta).is_some()
+                && self.grid.get_tile(position + delta).is_none_or(|tile| {
+                    matches!(tile.tile.state, TileState::Despawning(_))
+                        || !matches!(tile.tile.kind, TileKind::Leaf(_) | TileKind::Seed(_))
+                })
+            {
+                // Connection dropped
+                connections.set(delta, None);
+            }
+        }
+        let connect_count = connections.get_connections(position).count();
 
         let mut rng = thread_rng();
         let plant_config = &self.config.plants[&leaf.kind];
 
+        // Check plant size
+        let whole_plant = get_whole_plant(&self.grid, plant.pos, &self.config);
+        let plant_size = whole_plant.len();
+        let plant_seed = whole_plant.into_iter().find_map(|pos| {
+            if let Some(tile) = self.grid.get_tile(pos)
+                && let TileKind::Seed(seed) = &tile.tile.kind
+            {
+                Some((tile.pos, seed.total_energy()))
+            } else {
+                None
+            }
+        });
+        let energy_available = plant_seed.map_or(R32::ZERO, |(_, e)| e);
+        let plant_seed = plant_seed.map(|(p, _)| p);
+
+        let has_space_to_grow = self
+            .grid
+            .get_neighbors_all(plant.pos)
+            .any(|tile| tile.tile.is_none());
+
+        let_leaf!(let mut plant, leaf);
+        leaf.connections = connections;
+        leaf.is_growing = false;
+
+        if plant_size >= plant_config.max_size {
+            // Over max size
+            if let Some(timer) = &mut leaf.growth_timer {
+                *timer = Time::ONE;
+            }
+            return;
+        }
+
         // Update growth timer
+        if leaf.growth_timer.is_none() && connect_count <= 1 {
+            leaf.growth_timer = Some(R32::ONE);
+        }
+
         let mut grow = false;
-        if let Some(timer) = &mut leaf.growth_timer {
+        let mut energy_used = R32::ZERO;
+        if let Some(timer) = &mut leaf.growth_timer
+            && has_space_to_grow
+        {
             let growth_time = if is_lit {
                 plant_config.growth_time
             } else {
                 plant_config.growth_time_dark
             };
-            *timer -= delta_time / growth_time;
+            energy_used = (delta_time / growth_time).min(energy_available);
+            if energy_used > R32::ZERO {
+                leaf.is_growing = true;
+            }
+            *timer -= energy_used;
             if *timer <= Time::ZERO {
                 // Attempt to grow
                 grow = true;
@@ -31,44 +103,30 @@ impl Model {
             }
         }
 
+        if let Some(seed) = plant_seed
+            && let Some(tile) = self.grid.get_tile_mut(seed)
+            && let TileKind::Seed(seed) = &mut tile.tile.kind
+        {
+            seed.use_energy(energy_used);
+        }
+
         if !grow {
             return;
         }
 
         // Grow
-        let Some(plant) = self.grid.get_tile(position) else {
-            return;
-        };
-        let Tile::Leaf(leaf) = &plant.tile else {
-            return;
-        };
-        if get_all_connected(&self.grid, plant.pos, |tile| {
-            if let Tile::Leaf(other) = tile.tile
-                && leaf.kind == other.kind
-            {
-                true
-            } else {
-                false
-            }
-        })
-        .len()
-            >= plant_config.max_size
-        {
-            // Over max size
-            return;
-        }
-
-        // Grow
+        let_leaf!(let plant, leaf);
         let lights: Vec<vec2<ICoord>> = self
             .grid
             .all_tiles()
-            .filter(|tile| matches!(tile.tile, Tile::Light(true)))
+            .filter(|tile| matches!(tile.tile.kind, TileKind::Light(true)))
             .map(|tile| tile.pos)
             .collect();
-        let options: Vec<_> = [vec2(-1, 0), vec2(0, 1), vec2(1, 0), vec2(0, -1)]
-            .iter()
-            .copied()
-            .map(|delta| plant.pos + delta)
+
+        let options: Vec<_> = self
+            .grid
+            .get_neighbors_all(plant.pos)
+            .map(|tile| tile.pos)
             .filter(|&pos| can_grow_into(pos, &self.grid))
             .map(|pos| {
                 let light_d = lights
@@ -113,18 +171,38 @@ impl Model {
         // Spawn new plants
         let kind = leaf.kind;
         if let Some(grow) = grow_left {
-            self.grid.set_tile(grow, Tile::Leaf(Leaf::new(kind)));
+            let mut leaf = Leaf::new(kind);
+            leaf.connections.set(position - grow, Some(()));
+            self.grid.set_tile(grow, Tile::new(TileKind::Leaf(leaf)));
             self.context.sfx.play(&self.context.assets.sounds.grow);
         }
         if let Some(grow) = grow_right {
-            self.grid.set_tile(grow, Tile::Leaf(Leaf::new(kind)));
+            let mut leaf = Leaf::new(kind);
+            leaf.connections.set(position - grow, Some(()));
+            self.grid.set_tile(grow, Tile::new(TileKind::Leaf(leaf)));
+        }
+
+        // Connect
+        let_leaf!(let mut plant, leaf);
+        if let Some(grow) = grow_left {
+            leaf.connections.set(grow - position, Some(()));
+        }
+        if let Some(grow) = grow_right {
+            leaf.connections.set(grow - position, Some(()));
+        }
+
+        if grow_left.is_some()
+            && let Some(seed) = plant_seed
+            && let Some(tile) = self.grid.get_tile_mut(seed)
+        {
+            tile.tile.state.transform();
         }
     }
 }
 
 pub fn can_grow_into(pos: vec2<ICoord>, grid: &Grid) -> bool {
     match grid.get_tile(pos) {
-        Some(tile) => matches!(tile.tile, Tile::Wire(_) | Tile::Pipe(_)),
+        Some(tile) => matches!(tile.tile.kind, TileKind::Wire(_)),
         None => true,
     }
 }
@@ -138,7 +216,7 @@ fn density_around(grid: &Grid, pos: vec2<ICoord>) -> f32 {
                 grid.get_tile(pos)
             })
         })
-        .filter(|tile| matches!(tile.tile, Tile::Leaf(_)))
+        .filter(|tile| matches!(tile.tile.kind, TileKind::Leaf(_)))
         .count();
     let area = ((range * 2 + 1) as f32).sqr();
     leaves as f32 / area
