@@ -59,10 +59,9 @@ impl Model {
         let energy_available = plant_seed.map_or(R32::ZERO, |(_, e)| e);
         let plant_seed = plant_seed.map(|(p, _)| p);
 
-        let has_space_to_grow = self
-            .grid
-            .get_neighbors_all(plant.pos)
-            .any(|tile| tile.tile.is_none());
+        let has_space_to_grow = Connections::NEIGHBORS
+            .into_iter()
+            .any(|delta| can_grow_into(plant.pos + delta, &self.grid));
 
         let_leaf!(let mut plant, leaf);
         leaf.connections = connections;
