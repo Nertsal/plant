@@ -173,24 +173,24 @@ impl Model {
 
         if tile.tile.kind.is_collectable() {
             tile.tile.state.despawn();
-            let mut kind = tile.tile.kind.clone();
-            match &mut kind {
-                TileKind::Water(lifetime) | TileKind::Poop(lifetime) => {
-                    *lifetime = Lifetime::new(self.config.water_lifetime);
-                }
-                TileKind::Light(powered)
-                | TileKind::Wire(powered)
-                | TileKind::Sprinkler(powered) => *powered = false,
-                TileKind::Cutter(cutter) => *cutter = Cutter::default(),
-                TileKind::Seed(seed) => seed.growth_energy.clear(),
-                _ => {}
-            }
+            let kind = tile.tile.kind.clone();
             self.inventory_add(kind, 1);
             self.context.sfx.play(&self.context.assets.sounds.rock);
         }
     }
 
-    pub fn inventory_add(&mut self, tile: TileKind, count: usize) {
-        *self.inventory.entry(tile).or_insert(0) += count;
+    pub fn inventory_add(&mut self, mut kind: TileKind, count: usize) {
+        match &mut kind {
+            TileKind::Water(lifetime) | TileKind::Poop(lifetime) => {
+                *lifetime = Lifetime::new(self.config.water_lifetime);
+            }
+            TileKind::Light(powered) | TileKind::Wire(powered) => *powered = false,
+            TileKind::Pipe(connected) | TileKind::Sprinkler(connected) => *connected = false,
+            TileKind::Cutter(cutter) => *cutter = Cutter::default(),
+            TileKind::Seed(seed) => seed.growth_energy.clear(),
+            _ => {}
+        }
+
+        *self.inventory.entry(kind).or_insert(0) += count;
     }
 }
