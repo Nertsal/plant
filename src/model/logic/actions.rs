@@ -34,9 +34,7 @@ impl Model {
         };
 
         match &tile.tile.kind {
-            TileKind::Leaf(_) | TileKind::Seed(_) => {
-                DroneTarget::Interact(target, DroneAction::CutPlant)
-            }
+            TileKind::Leaf(_) | TileKind::Seed(_) => DroneTarget::CutPlant(target),
             TileKind::Bug(bug) => DroneTarget::KillBug(bug.id),
             _ if tile.tile.kind.is_collectable() => {
                 if self.inventory.len() >= INVENTORY_MAX_SIZE {
@@ -46,7 +44,7 @@ impl Model {
                     //     .play(&self.context.assets.sounds.drone_deny);
                     return DroneTarget::MoveTo(target);
                 }
-                DroneTarget::Interact(target, DroneAction::Collect)
+                DroneTarget::Collect(target)
             }
             _ => DroneTarget::MoveTo(target),
         }

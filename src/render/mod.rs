@@ -471,7 +471,7 @@ impl GameRender {
             let white = crate::util::with_alpha(Color::WHITE, alpha);
             match *action {
                 DroneTarget::MoveTo(_) => {}
-                DroneTarget::Interact(target, _) => {
+                DroneTarget::Collect(target) | DroneTarget::CutPlant(target) => {
                     tile_highlight(Some(action.name()), target, white, framebuffer);
                 }
                 DroneTarget::PlaceTile(target, ref tile)

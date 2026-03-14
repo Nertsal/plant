@@ -676,7 +676,8 @@ impl Model {
         ];
 
         actions.find(|(_, action)| match **action {
-            DroneTarget::Interact(pos, _)
+            DroneTarget::Collect(pos)
+            | DroneTarget::CutPlant(pos)
             | DroneTarget::PlaceTile(pos, _)
             | DroneTarget::BuyTile(pos, _) => pos == target,
             DroneTarget::KillBug(id) => self.grid.get_tile(target).is_some_and(|tile| {

@@ -18,7 +18,8 @@ impl Model {
             None => self.drone.position,
             Some(target) => match *target {
                 DroneTarget::MoveTo(pos)
-                | DroneTarget::Interact(pos, _)
+                | DroneTarget::Collect(pos)
+                | DroneTarget::CutPlant(pos)
                 | DroneTarget::PlaceTile(pos, _)
                 | DroneTarget::BuyTile(pos, _) => self.grid_visual.tile_bounds(pos).center(),
                 DroneTarget::KillBug(bug_id) => {
@@ -90,32 +91,36 @@ impl Model {
         let Some(target) = self.drone.target.clone() else {
             return;
         };
+
+        // Timer progress
+        let mut action_finish = false;
+        if let Some(action) = target.action() {
+            self.drone.action_progress += delta_time / self.config.action_duration[&action];
+            if self.drone.action_progress >= R32::ONE {
+                self.drone.action_progress = R32::ZERO;
+                action_finish = true
+            }
+        }
+
         match target {
             DroneTarget::MoveTo(_) => {
                 // Stop once reached
                 self.drone.target = None;
             }
-            DroneTarget::Interact(position, action) => {
-                self.drone.action_progress += delta_time / self.config.action_duration[&action];
-                if self.drone.action_progress >= R32::ONE {
-                    self.drone.action_progress = R32::ZERO;
+            DroneTarget::Collect(position) => {
+                if action_finish {
                     self.drone.target = None;
-                    match action {
-                        DroneAction::CutPlant => {
-                            self.cut_plant_tile(position, true);
-                        }
-                        DroneAction::Collect => {
-                            self.collect(position);
-                        }
-                        DroneAction::PlaceTile | DroneAction::KillBug => unreachable!(),
-                    }
+                    self.collect(position);
+                }
+            }
+            DroneTarget::CutPlant(position) => {
+                if action_finish {
+                    self.drone.target = None;
+                    self.cut_plant_tile(position, true);
                 }
             }
             DroneTarget::KillBug(bug_id) => {
-                self.drone.action_progress +=
-                    delta_time / self.config.action_duration[&DroneAction::KillBug];
-                if self.drone.action_progress >= R32::ONE {
-                    self.drone.action_progress = R32::ZERO;
+                if action_finish {
                     self.drone.target = None;
                     let bug = self.grid.tiles.iter().find(|(_, tile)| {
                         if let TileKind::Bug(bug) = &tile.kind
@@ -135,10 +140,7 @@ impl Model {
                 }
             }
             DroneTarget::PlaceTile(position, tile) => {
-                self.drone.action_progress +=
-                    delta_time / self.config.action_duration[&DroneAction::PlaceTile];
-                if self.drone.action_progress >= R32::ONE {
-                    self.drone.action_progress = R32::ZERO;
+                if action_finish {
                     self.drone.target = None;
                     if self.grid.get_tile(position).is_none()
                         && let Some(count) = self.inventory.get_mut(&tile)
@@ -153,10 +155,7 @@ impl Model {
                 }
             }
             DroneTarget::BuyTile(position, tile) => {
-                self.drone.action_progress +=
-                    delta_time / self.config.action_duration[&DroneAction::PlaceTile];
-                if self.drone.action_progress >= R32::ONE {
-                    self.drone.action_progress = R32::ZERO;
+                if action_finish {
                     self.drone.target = None;
                     let cost = self.config.get_cost(&tile);
                     if self.grid.get_tile(position).is_none() && self.money >= cost {
