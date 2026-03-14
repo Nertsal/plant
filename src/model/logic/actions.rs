@@ -7,7 +7,6 @@ impl Model {
             return;
         }
 
-        log::debug!("interact with {}", target);
         let interaction = self.tile_interaction(target);
         if let DroneTarget::MoveTo(_) = interaction {
             // Tell the closest unoccupied drone to move here
@@ -24,10 +23,13 @@ impl Model {
                     .play(&self.context.assets.sounds.drone_confirm);
             }
         } else {
-            self.queued_actions.push_back(interaction);
-            self.context
-                .sfx
-                .play(&self.context.assets.sounds.drone_confirm);
+            log::debug!("interact with {}: {:?}", target, interaction);
+            if interaction.is_relevant(&self.grid) {
+                self.queued_actions.push_back(interaction);
+                self.context
+                    .sfx
+                    .play(&self.context.assets.sounds.drone_confirm);
+            }
         }
     }
 
@@ -41,7 +43,7 @@ impl Model {
             TileKind::Leaf(_) | TileKind::Seed(_) => DroneTarget::CutPlant(target),
             TileKind::Bug(bug) => DroneTarget::KillBug(bug.id),
             _ if tile.tile.kind.is_collectable() => {
-                if self.inventory.len() >= INVENTORY_MAX_SIZE {
+                if !self.can_collect(&tile.tile.kind) {
                     // Inventory already maxed
                     // self.context
                     //     .sfx
