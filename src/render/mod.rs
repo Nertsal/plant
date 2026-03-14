@@ -512,34 +512,36 @@ impl GameRender {
 
         // Input state
         if let Some(target) = cursor.grid_pos {
-            match input_state {
-                InputState::Idle => {
-                    let color = if let Some(tile) = model.grid.get_tile(target)
-                        && let TileKind::Bug(_) = tile.tile.kind
-                    {
-                        Color::new(0.7, 0.1, 0.1, 0.5)
-                    } else {
-                        Color::new(0.7, 0.7, 0.7, 0.5)
-                    };
-                    tile_highlight(None, target, color, framebuffer);
-                    if let Some(tile) = model.grid.get_tile(target) {
-                        let pos = model
-                            .grid_visual
-                            .tile_bounds(target)
-                            .as_f32()
-                            .align_pos(vec2(0.0, 0.0));
-                        self.tile_description(
-                            pos,
-                            6.0,
-                            0.5,
-                            &tile.tile.kind,
-                            false,
-                            pixel_scale,
-                            &model.camera,
-                            framebuffer,
-                        );
-                    }
+            let tile_action = |framebuffer: &mut ugli::Framebuffer| {
+                let color = if let Some(tile) = model.grid.get_tile(target)
+                    && let TileKind::Bug(_) = tile.tile.kind
+                {
+                    Color::new(0.7, 0.1, 0.1, 0.5)
+                } else {
+                    Color::new(0.7, 0.7, 0.7, 0.5)
+                };
+                tile_highlight(None, target, color, framebuffer);
+                if let Some(tile) = model.grid.get_tile(target) {
+                    let pos = model
+                        .grid_visual
+                        .tile_bounds(target)
+                        .as_f32()
+                        .align_pos(vec2(0.0, 0.0));
+                    self.tile_description(
+                        pos,
+                        6.0,
+                        0.5,
+                        &tile.tile.kind,
+                        false,
+                        pixel_scale,
+                        &model.camera,
+                        framebuffer,
+                    );
                 }
+            };
+            match input_state {
+                InputState::Idle => tile_action(framebuffer),
+                _ if model.grid.get_tile(target).is_some() => tile_action(framebuffer),
                 InputState::PlaceTile(tile) | InputState::BuyTile(tile) => {
                     ghost_tile(target, tile, Color::new(0.7, 0.7, 0.7, 0.5), framebuffer);
                 }
@@ -742,7 +744,7 @@ impl GameRender {
 
     #[allow(clippy::too_many_arguments)]
     fn tile_description(
-        &mut self,
+        &self,
         pos: vec2<f32>,
         width: f32,
         font_size: f32,

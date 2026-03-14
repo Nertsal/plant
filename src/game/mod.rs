@@ -105,20 +105,24 @@ impl GameState {
         }
 
         if let Some(target) = self.cursor.grid_pos {
-            match &self.input_state {
-                InputState::Idle => {
-                    self.model.interact_with(target, false);
-                }
-                InputState::PlaceTile(tile) => {
-                    self.model.place_tile(target, tile.clone());
-                    if !self.model.can_place_tile(tile, true) {
-                        self.input_state = InputState::Idle;
+            if self.model.grid.get_tile(target).is_some() {
+                self.model.interact_with(target, false);
+            } else {
+                match &self.input_state {
+                    InputState::Idle => {
+                        self.model.interact_with(target, false);
                     }
-                }
-                InputState::BuyTile(tile) => {
-                    self.model.buy_tile(target, tile.clone());
-                    if !self.model.can_buy_tile(tile, true) {
-                        self.input_state = InputState::Idle;
+                    InputState::PlaceTile(tile) => {
+                        self.model.place_tile(target, tile.clone());
+                        if !self.model.can_place_tile(tile, true) {
+                            self.input_state = InputState::Idle;
+                        }
+                    }
+                    InputState::BuyTile(tile) => {
+                        self.model.buy_tile(target, tile.clone());
+                        if !self.model.can_buy_tile(tile, true) {
+                            self.input_state = InputState::Idle;
+                        }
                     }
                 }
             }
