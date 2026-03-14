@@ -366,7 +366,9 @@ impl GameRender {
                 }
                 _ if tile.tile.kind.transmits_power() => {
                     for neighbor in model.grid.get_neighbors(tile.pos) {
-                        if neighbor.tile.kind.transmits_power() {
+                        if neighbor.tile.kind.transmits_power()
+                            && !matches!(neighbor.tile.state, TileState::Despawning(_))
+                        {
                             add_connection(tile.pos, neighbor.pos, palette.connection_power);
                         }
                     }
