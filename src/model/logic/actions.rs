@@ -147,7 +147,8 @@ impl Model {
     }
 
     pub fn can_collect(&self, kind: &TileKind) -> bool {
-        self.inventory.len() < INVENTORY_MAX_SIZE || self.inventory.contains_key(kind)
+        let kind = tile_kind_normalization(kind.clone());
+        self.inventory.len() < INVENTORY_MAX_SIZE || self.inventory.contains_key(&kind)
     }
 
     pub fn can_collect_at(&self, target: vec2<ICoord>) -> bool {
@@ -179,18 +180,22 @@ impl Model {
         }
     }
 
-    pub fn inventory_add(&mut self, mut kind: TileKind, count: usize) {
-        match &mut kind {
-            TileKind::Water(lifetime) | TileKind::Poop(lifetime) => {
-                *lifetime = Lifetime::new(self.config.water_lifetime);
-            }
-            TileKind::Light(powered) | TileKind::Wire(powered) => *powered = false,
-            TileKind::Pipe(connected) | TileKind::Sprinkler(connected) => *connected = false,
-            TileKind::Cutter(cutter) => *cutter = Cutter::default(),
-            TileKind::Seed(seed) => seed.growth_energy.clear(),
-            _ => {}
-        }
-
+    pub fn inventory_add(&mut self, kind: TileKind, count: usize) {
+        let kind = tile_kind_normalization(kind);
         *self.inventory.entry(kind).or_insert(0) += count;
     }
+}
+
+fn tile_kind_normalization(mut kind: TileKind) -> TileKind {
+    match &mut kind {
+        TileKind::Water(lifetime) | TileKind::Poop(lifetime) => {
+            lifetime.remaining = lifetime.max;
+        }
+        TileKind::Light(powered) | TileKind::Wire(powered) => *powered = false,
+        TileKind::Pipe(connected) | TileKind::Sprinkler(connected) => *connected = false,
+        TileKind::Cutter(cutter) => *cutter = Cutter::default(),
+        TileKind::Seed(seed) => *seed = Seed::new(seed.kind),
+        _ => {}
+    }
+    kind
 }
