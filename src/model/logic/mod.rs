@@ -263,6 +263,7 @@ impl Model {
                     if !can_move {
                         return;
                     }
+
                     let delta = target - pos;
                     let dir = if delta.x.abs() > delta.y.abs() {
                         vec2(delta.x.signum(), 0)
@@ -313,41 +314,49 @@ impl Model {
                             })
                             .min_by_key(|tile| manhattan_distance(pos, tile.pos))
                             .map(|tile| tile.pos);
-                        let target = leaf_target
-                            .or_else(|| {
-                                // Move in available random direction
-                                self.grid
-                                    .get_neighbors_all(pos)
-                                    .filter(|tile| bug_can_move_into(&self.grid, tile.pos))
-                                    .map(|tile| tile.pos)
-                                    .choose(&mut rng)
-                            })
-                            .unwrap_or(pos);
 
                         // Go towards target
-                        if manhattan_distance(pos, target) <= 1
-                            && let Some(tile) = self.grid.get_tile(target)
-                            && let TileKind::Leaf(_) = tile.tile.kind
-                        {
-                            // eat
-                            if let Some(bug) = self.grid.get_tile_mut(pos)
-                                && let TileKind::Bug(bug) = &mut bug.tile.kind
-                                && let BugState::Hungry {
-                                    eating_timer,
-                                    hunger,
-                                } = &mut bug.state
+                        if let Some(target) = leaf_target {
+                            // Go to the leaves
+                            if manhattan_distance(pos, target) <= 1
+                                && let Some(tile) = self.grid.get_tile(target)
+                                && let TileKind::Leaf(_) = tile.tile.kind
                             {
-                                eating_timer.change(-delta_time);
-                                if eating_timer.remaining <= Time::ZERO {
-                                    *eating_timer = Lifetime::new(self.config.bug_eat_time);
-                                    *hunger -= 1;
-                                    self.cut_plant_tile(target, false);
-                                    self.context.sfx.play(&self.context.assets.sounds.bug_eat);
+                                // eat
+                                if let Some(bug) = self.grid.get_tile_mut(pos)
+                                    && let TileKind::Bug(bug) = &mut bug.tile.kind
+                                    && let BugState::Hungry {
+                                        eating_timer,
+                                        hunger,
+                                    } = &mut bug.state
+                                {
+                                    eating_timer.change(-delta_time);
+                                    if eating_timer.remaining <= Time::ZERO {
+                                        *eating_timer = Lifetime::new(self.config.bug_eat_time);
+                                        *hunger -= 1;
+                                        self.cut_plant_tile(target, false);
+                                        self.context.sfx.play(&self.context.assets.sounds.bug_eat);
+                                    }
+                                }
+                            } else {
+                                // move towards the plant
+                                if let Some(path) = self.grid.bug_find_path(pos, target)
+                                    && let Some(&next) = path.get(1)
+                                {
+                                    move_towards(next, &mut self.grid);
                                 }
                             }
                         } else {
-                            // move
-                            move_towards(target, &mut self.grid);
+                            // move in available random direction
+                            if let Some(target) = self
+                                .grid
+                                .get_neighbors_all(pos)
+                                .filter(|tile| bug_can_move_into(&self.grid, tile.pos))
+                                .map(|tile| tile.pos)
+                                .choose(&mut rng)
+                            {
+                                move_towards(target, &mut self.grid);
+                            }
                         }
                     }
                     BugState::Pooping(timer) => {
@@ -720,6 +729,32 @@ impl Model {
             }),
             DroneTarget::MoveTo(_) => false,
         })
+    }
+}
+
+impl Grid {
+    pub fn bug_find_path(
+        &self,
+        from: vec2<ICoord>,
+        plant: vec2<ICoord>,
+    ) -> Option<Vec<vec2<ICoord>>> {
+        pathfinding::directed::astar::astar(
+            &from,
+            |&pos| {
+                self.get_neighbors_all(pos)
+                    .filter(|tile| match tile.tile {
+                        None => true,
+                        Some(tile) => matches!(tile.kind, TileKind::Wire(_)),
+                    })
+                    .map(|tile| (tile.pos, 1))
+            },
+            |&from| manhattan_distance(from, plant),
+            |&pos| {
+                self.get_neighbors(pos)
+                    .any(|tile| matches!(tile.tile.kind, TileKind::Leaf(_)))
+            },
+        )
+        .map(|(p, _)| p)
     }
 }
 
