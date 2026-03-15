@@ -301,8 +301,8 @@ impl TileKind {
                 }
                 SoilState::Rich => "Turns into Dry Soil after plant growth",
             },
-            TileKind::Water(_) => "Spawns around leaves\nDisappears overtime",
-            TileKind::Bug(_) => "Eats Plants and produces Poop\nSpawns in unlit areas",
+            TileKind::Water(_) => "Spawns around Leaves\nDisappears overtime",
+            TileKind::Bug(_) => "Eats Leaves and produces Poop\nSpawns in unlit areas",
             TileKind::Poop(_) => "Can be used to nourish the Soil\nDisappears overtime",
             TileKind::Power => "Provides power to tiles connected with Wires",
             TileKind::Wire(_) => {
