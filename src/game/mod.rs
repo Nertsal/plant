@@ -40,6 +40,9 @@ pub enum DragTarget {
     Camera,
     /// Cancel hovered queued actions.
     CancelQueued,
+    Interact,
+    PlaceTile(TileKind),
+    BuyTile(TileKind),
 }
 
 pub struct CursorState {
@@ -97,8 +100,72 @@ impl GameState {
         }
     }
 
-    /// Called every frame that the LMB is held down.
-    fn lmb_down(&mut self) {
+    fn start_drag(&mut self, target: DragTarget) {
+        self.drag = Some(Drag {
+            from_world: match target {
+                DragTarget::Camera => self.model.camera.center.as_r32(),
+                _ => self.cursor.world_pos,
+            },
+            from_screen: self.cursor.screen_pos,
+            from_real_time: self.real_time,
+            has_moved: false,
+            target,
+        });
+        self.update_drag();
+    }
+
+    fn update_drag(&mut self) {
+        let Some(drag) = &mut self.drag else {
+            return;
+        };
+        if drag.from_screen != self.cursor.screen_pos {
+            drag.has_moved = true;
+        }
+        match &drag.target {
+            DragTarget::Camera => {
+                let from = self
+                    .model
+                    .camera
+                    .screen_to_world(self.framebuffer_size.as_f32(), drag.from_screen.as_f32());
+                let to = self.model.camera.screen_to_world(
+                    self.framebuffer_size.as_f32(),
+                    self.cursor.screen_pos.as_f32(),
+                );
+                self.model.camera.center = drag.from_world.as_f32() + from - to;
+            }
+            DragTarget::CancelQueued => {
+                if drag.has_moved {
+                    self.cancel_queued();
+                }
+            }
+            DragTarget::Interact => {
+                if let Some(target) = self.cursor.grid_pos {
+                    self.model.interact_with(target, false);
+                }
+            }
+            DragTarget::PlaceTile(tile) => {
+                if let Some(target) = self.cursor.grid_pos {
+                    self.model.place_tile(target, tile.clone());
+                    if !self.model.can_place_tile(tile, true) {
+                        self.input_state = InputState::Idle;
+                        self.drag = None;
+                    }
+                }
+            }
+            DragTarget::BuyTile(tile) => {
+                if let Some(target) = self.cursor.grid_pos {
+                    self.model.buy_tile(target, tile.clone());
+                    if !self.model.can_buy_tile(tile, true) {
+                        self.input_state = InputState::Idle;
+                        self.drag = None;
+                    }
+                }
+            }
+        }
+    }
+
+    /// Called the first frame that the LMB is pressed down.
+    fn lmb_press(&mut self) {
         if self.ui.inventory.hovered || self.ui.shop.hovered {
             // Focus UI first
             return;
@@ -106,21 +173,28 @@ impl GameState {
 
         if let Some(target) = self.cursor.grid_pos {
             if self.model.grid.get_tile(target).is_some() {
-                self.model.interact_with(target, false);
+                if self.model.interact_with(target, false).is_some() {
+                    self.start_drag(DragTarget::Interact);
+                }
             } else {
                 match &self.input_state {
                     InputState::Idle => {
                         self.model.interact_with(target, false);
+                        self.start_drag(DragTarget::Interact);
                     }
                     InputState::PlaceTile(tile) => {
                         self.model.place_tile(target, tile.clone());
-                        if !self.model.can_place_tile(tile, true) {
+                        if self.model.can_place_tile(tile, true) {
+                            self.start_drag(DragTarget::PlaceTile(tile.clone()));
+                        } else {
                             self.input_state = InputState::Idle;
                         }
                     }
                     InputState::BuyTile(tile) => {
                         self.model.buy_tile(target, tile.clone());
-                        if !self.model.can_buy_tile(tile, true) {
+                        if self.model.can_buy_tile(tile, true) {
+                            self.start_drag(DragTarget::BuyTile(tile.clone()));
+                        } else {
                             self.input_state = InputState::Idle;
                         }
                     }
@@ -174,29 +248,8 @@ impl geng::State for GameState {
             self.zoom.update(delta_time as f32);
             self.model.camera.fov = Camera2dFov::MinSide(15.0 + self.zoom.current);
         }
-        if let Some(drag) = &mut self.drag {
-            if drag.from_screen != self.cursor.screen_pos {
-                drag.has_moved = true;
-            }
-            match drag.target {
-                DragTarget::Camera => {
-                    let from = self
-                        .model
-                        .camera
-                        .screen_to_world(self.framebuffer_size.as_f32(), drag.from_screen.as_f32());
-                    let to = self.model.camera.screen_to_world(
-                        self.framebuffer_size.as_f32(),
-                        self.cursor.screen_pos.as_f32(),
-                    );
-                    self.model.camera.center = drag.from_world.as_f32() + from - to;
-                }
-                DragTarget::CancelQueued => {
-                    if drag.has_moved {
-                        self.cancel_queued();
-                    }
-                }
-            }
-        }
+
+        self.update_drag();
 
         let mut delta_time = Time::new(delta_time as f32);
         self.delta_time = delta_time;
@@ -204,9 +257,6 @@ impl geng::State for GameState {
 
         let geng = self.context.geng.clone();
         let window = geng.window();
-        if window.is_button_pressed(geng::MouseButton::Left) {
-            self.lmb_down();
-        }
 
         if cfg!(feature = "cheats")
             && window.is_key_pressed(geng::Key::T)
@@ -308,6 +358,7 @@ impl geng::State for GameState {
                 }
                 geng::MouseButton::Left => {
                     self.cursor.pressed = Some((self.cursor.screen_pos, self.real_time));
+                    self.lmb_press();
                 }
             },
             geng::Event::MouseRelease { button } => {

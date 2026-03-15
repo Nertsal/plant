@@ -1,10 +1,10 @@
 use super::*;
 
 impl Model {
-    pub fn interact_with(&mut self, target: vec2<ICoord>, allow_move: bool) {
+    pub fn interact_with(&mut self, target: vec2<ICoord>, allow_move: bool) -> Option<DroneTarget> {
         if self.active_action_at(target).is_some() {
             // Cannot interact with ghosts
-            return;
+            return None;
         }
 
         let interaction = self.tile_interaction(target);
@@ -17,20 +17,24 @@ impl Model {
                     .as_ref()
                     .is_none_or(|target| matches!(target, DroneTarget::MoveTo(_)))
             {
-                self.drone.target = Some(interaction);
+                self.drone.target = Some(interaction.clone());
                 self.context
                     .sfx
                     .play(&self.context.assets.sounds.drone_confirm);
+                return Some(interaction);
             }
         } else {
             log::debug!("interact with {}: {:?}", target, interaction);
             if interaction.is_relevant(&self.grid) {
-                self.queued_actions.push_back(interaction);
+                self.queued_actions.push_back(interaction.clone());
                 self.context
                     .sfx
                     .play(&self.context.assets.sounds.drone_confirm);
+                return Some(interaction);
             }
         }
+
+        None
     }
 
     pub fn tile_interaction(&self, target: vec2<ICoord>) -> DroneTarget {
