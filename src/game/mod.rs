@@ -273,7 +273,7 @@ impl geng::State for GameState {
             .iter_mut()
             .zip(&self.model.inventory)
         {
-            if widget.mouse_left.clicked && self.model.can_place_tile(tile, true) {
+            if widget.mouse_left.just_pressed && self.model.can_place_tile(tile, true) {
                 self.input_state = InputState::PlaceTile(tile.clone());
                 widget.hovered_time = Some(0.0);
                 break;
@@ -291,7 +291,7 @@ impl geng::State for GameState {
                         && !self.model.unlocked_shop.contains(tile)
                 })
                 .map(|item| item.unlocked_at);
-            if widget.mouse_left.clicked {
+            if widget.mouse_left.just_pressed {
                 if let Some(unlock) = unlock_cost {
                     if self.model.money >= unlock {
                         self.model.money -= unlock;
@@ -383,6 +383,7 @@ impl geng::State for GameState {
                         }
                     }
                     geng::MouseButton::Left => {
+                        self.drag.take();
                         if let Some((from_screen, from_real_time)) = self.cursor.pressed
                             && (self.cursor.screen_pos - from_screen).len_sqr() < CLICK_MAX_DISTANCE
                             && (self.real_time - from_real_time).as_f32() < CLICK_MAX_DURATION
