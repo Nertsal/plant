@@ -62,6 +62,8 @@ pub enum InputState {
 
 impl GameState {
     pub fn new(context: Context) -> Self {
+        context.music.play(&context.assets.music.dewdrop, true);
+
         let mut game = Self {
             render: GameRender::new(context.clone()),
             model: Model::new(context.clone(), context.assets.config.clone()),

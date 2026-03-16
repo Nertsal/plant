@@ -15,6 +15,7 @@ pub struct Assets {
     pub palette: Palette,
     pub sprites: Sprites,
     pub sounds: Sounds,
+    pub music: Music,
     pub shaders: Shaders,
     pub fonts: Fonts,
     pub config: Config,
@@ -143,6 +144,12 @@ impl SpritesTiles {
             TileKind::Rock => Some(&self.rock),
         }
     }
+}
+
+#[derive(geng::asset::Load)]
+pub struct Music {
+    #[load(ext = "mp3")]
+    pub dewdrop: Rc<geng::Sound>,
 }
 
 #[derive(geng::asset::Load)]

@@ -19,7 +19,7 @@ impl MusicManager {
         Self {
             inner: RefCell::new(MusicManagerImpl {
                 geng,
-                volume: SecondOrderState::new(3.0, 1.0, 0.0, 0.5),
+                volume: SecondOrderState::new(3.0, 1.0, 0.0, 0.4),
                 playing: None,
             }),
         }
