@@ -10,12 +10,16 @@ const ZOOM_MAX: f32 = 15.0;
 const CLICK_MAX_DISTANCE: f64 = 10.0;
 const CLICK_MAX_DURATION: f32 = 0.5;
 
+const FIXED_FPS: f32 = 20.0;
+const FIXED_DELTA_TIME: f32 = FIXED_FPS.recip();
+
 pub struct GameState {
     context: Context,
     ui_context: UiContext,
     framebuffer_size: vec2<usize>,
     delta_time: Time,
     real_time: Time,
+    model_update_timer: f32,
 
     render: GameRender,
     model: Model,
@@ -81,6 +85,7 @@ impl GameState {
             framebuffer_size: vec2(1, 1),
             delta_time: Time::new(0.1),
             real_time: Time::ZERO,
+            model_update_timer: 0.0,
             context,
         };
         game.zoom.target = 0.001; // For better pixels (slight misaligned)
@@ -264,7 +269,12 @@ impl geng::State for GameState {
         {
             delta_time *= r32(20.0);
         }
-        self.model.update(delta_time);
+        delta_time *= r32(20.0);
+        self.model_update_timer -= delta_time.as_f32();
+        while self.model_update_timer < 0.0 {
+            self.model.update(r32(FIXED_DELTA_TIME));
+            self.model_update_timer += FIXED_DELTA_TIME;
+        }
 
         // UI events
         for (widget, (tile, _)) in self
