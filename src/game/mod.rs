@@ -10,7 +10,7 @@ const ZOOM_MAX: f32 = 15.0;
 const CLICK_MAX_DISTANCE: f64 = 10.0;
 const CLICK_MAX_DURATION: f32 = 0.5;
 
-const FIXED_FPS: f32 = 20.0;
+const FIXED_FPS: f32 = 60.0;
 const FIXED_DELTA_TIME: f32 = FIXED_FPS.recip();
 
 pub struct GameState {
