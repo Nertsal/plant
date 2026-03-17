@@ -464,6 +464,7 @@ impl GameRender {
             }
             let name = name.or_else(|| {
                 if let Some(tile) = model.grid.get_tile(pos)
+                    && !matches!(tile.tile.state, TileState::Despawning(_))
                     && !matches!(tile.tile.kind, TileKind::GhostBlock(_))
                 {
                     Some(model.tile_interaction(pos).name())
@@ -479,17 +480,22 @@ impl GameRender {
                           tile: &TileKind,
                           color: Color,
                           framebuffer: &mut ugli::Framebuffer<'_>| {
-            if model.grid.get_tile(pos).is_none()
+            if model
+                .grid
+                .get_tile(pos)
+                .is_none_or(|tile| matches!(tile.tile.state, TileState::Despawning(_)))
                 && let Some(texture) = sprites.tiles.get_texture(tile)
             {
-                self.util.draw_on_tile(
-                    &model.grid_visual,
-                    pos,
-                    Color::new(0.7, 0.7, 0.7, HOVER_ALPHA),
-                    texture,
-                    &model.camera,
-                    framebuffer,
-                );
+                if model.grid.get_tile(pos).is_none() {
+                    self.util.draw_on_tile(
+                        &model.grid_visual,
+                        pos,
+                        Color::new(0.7, 0.7, 0.7, HOVER_ALPHA),
+                        texture,
+                        &model.camera,
+                        framebuffer,
+                    );
+                }
                 tile_highlight(Some(DroneAction::PlaceTile.name()), pos, color, framebuffer);
             }
         };
@@ -565,7 +571,13 @@ impl GameRender {
             };
             match input_state {
                 InputState::Idle => tile_action(framebuffer),
-                _ if model.grid.get_tile(target).is_some() => tile_action(framebuffer),
+                _ if model
+                    .grid
+                    .get_tile(target)
+                    .is_some_and(|tile| !matches!(tile.tile.state, TileState::Despawning(_))) =>
+                {
+                    tile_action(framebuffer)
+                }
                 InputState::PlaceTile(tile) | InputState::BuyTile(tile) => {
                     ghost_tile(target, tile, Color::new(0.7, 0.7, 0.7, 0.5), framebuffer);
                 }

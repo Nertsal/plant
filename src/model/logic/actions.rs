@@ -91,7 +91,12 @@ impl Model {
         }
 
         log::debug!("place tile at {}: {:?}", target, tile);
-        if self.grid.get_tile(target).is_some() || !self.inventory.iter().any(|(t, _)| *t == tile) {
+        if self
+            .grid
+            .get_tile(target)
+            .is_some_and(|tile| !matches!(tile.tile.state, TileState::Despawning(_)))
+            || !self.inventory.iter().any(|(t, _)| *t == tile)
+        {
             return false;
         }
 

@@ -178,7 +178,12 @@ impl GameState {
         }
 
         if let Some(target) = self.cursor.grid_pos {
-            if self.model.grid.get_tile(target).is_some() {
+            if self
+                .model
+                .grid
+                .get_tile(target)
+                .is_some_and(|tile| !matches!(tile.tile.state, TileState::Despawning(_)))
+            {
                 if self.model.interact_with(target, false).is_some() {
                     self.start_drag(DragTarget::Interact);
                 }
