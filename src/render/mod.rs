@@ -297,7 +297,7 @@ impl GameRender {
                 let t = model.drone.action_progress.as_f32();
                 *shake = *shake * 0.5
                     + Angle::from_degrees(thread_rng().gen_range(0.0..=360.0)).unit_vec()
-                        * 0.01
+                        * 0.05
                         * t;
                 transform *= mat3::translate(*shake);
             }
