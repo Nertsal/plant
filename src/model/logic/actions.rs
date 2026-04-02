@@ -60,6 +60,14 @@ impl Model {
         }
     }
 
+    fn can_build_at(&self, target: vec2<ICoord>) -> bool {
+        self.active_action_at(target).is_none()
+            && self
+                .grid
+                .get_tile(target)
+                .is_none_or(|tile| matches!(tile.tile.state, TileState::Despawning { .. }))
+    }
+
     /// If `count_queued` is true, also accounts for the queued actions not yet taken by drones.
     pub fn can_place_tile(&self, tile: &TileKind, count_queued: bool) -> bool {
         let mut queued = 0;
@@ -85,20 +93,11 @@ impl Model {
     }
 
     pub fn place_tile(&mut self, target: vec2<ICoord>, tile: TileKind) -> bool {
-        if self.active_action_at(target).is_some() {
-            // Cannot place on top of ghosts
+        if !self.can_build_at(target) || !self.inventory.iter().any(|(t, _)| *t == tile) {
             return false;
         }
 
         log::debug!("place tile at {}: {:?}", target, tile);
-        if self
-            .grid
-            .get_tile(target)
-            .is_some_and(|tile| !matches!(tile.tile.state, TileState::Despawning { .. }))
-            || !self.inventory.iter().any(|(t, _)| *t == tile)
-        {
-            return false;
-        }
 
         self.queued_actions
             .push_back(DroneTarget::PlaceTile(target, tile));
@@ -131,20 +130,11 @@ impl Model {
     }
 
     pub fn buy_tile(&mut self, target: vec2<ICoord>, tile: TileKind) -> bool {
-        if self.active_action_at(target).is_some() {
-            // Cannot place on top of ghosts
+        if !self.can_build_at(target) || self.money < self.config.get_cost(&tile) {
             return false;
         }
 
         log::debug!("buy tile at {}: {:?}", target, tile);
-        if self.grid.get_tile(target).is_some() {
-            return false;
-        }
-
-        let cost = self.config.get_cost(&tile);
-        if self.money < cost {
-            return false;
-        }
 
         self.queued_actions
             .push_back(DroneTarget::BuyTile(target, tile));

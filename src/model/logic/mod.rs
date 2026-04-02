@@ -747,7 +747,7 @@ impl Model {
         }
     }
 
-    pub fn active_action_at(&mut self, target: vec2<ICoord>) -> Option<(ActionId, &DroneTarget)> {
+    pub fn active_action_at(&self, target: vec2<ICoord>) -> Option<(ActionId, &DroneTarget)> {
         let mut actions = itertools::chain![
             self.drone
                 .target
