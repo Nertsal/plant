@@ -15,6 +15,13 @@ pub type Id = usize;
 
 pub const INVENTORY_MAX_SIZE: usize = 10;
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum GameEvent {
+    PlantGrowth,
+    BugEat,
+    BugPoop,
+}
+
 pub enum ActionId {
     Drone,
     Queued(usize),
@@ -36,6 +43,8 @@ pub struct Model {
     pub drone: Drone,
     pub queued_actions: VecDeque<DroneTarget>,
     pub inventory: LinearMap<TileKind, usize>,
+
+    pub events: Vec<GameEvent>,
 }
 
 impl Model {
@@ -67,6 +76,8 @@ impl Model {
             inventory: [(TileKind::Seed(Seed::new(PlantKind::TypeA)), 1)]
                 .into_iter()
                 .collect(),
+
+            events: Vec::new(),
 
             config,
             context,

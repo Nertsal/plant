@@ -246,6 +246,27 @@ impl GameState {
             false
         }
     }
+
+    fn handle_game_events(&mut self, events: impl IntoIterator<Item = GameEvent>) {
+        let mut sfx = LinearMap::new();
+        for event in events {
+            match event {
+                GameEvent::PlantGrowth | GameEvent::BugEat | GameEvent::BugPoop => {
+                    sfx.insert(event, ());
+                }
+            }
+        }
+
+        let sounds = &self.context.assets.sounds;
+        for (sfx, ()) in sfx {
+            let sfx = match sfx {
+                GameEvent::PlantGrowth => &sounds.grow,
+                GameEvent::BugEat => &sounds.bug_eat,
+                GameEvent::BugPoop => &sounds.bug_poop,
+            };
+            self.context.sfx.play(sfx);
+        }
+    }
 }
 
 impl geng::State for GameState {
@@ -280,6 +301,7 @@ impl geng::State for GameState {
             delta_time *= r32(20.0);
         }
 
+        // Update game
         self.model_update_timer -= delta_time.as_f32();
         while self.model_update_timer < 0.0 {
             self.model.fixed_update(r32(FIXED_DELTA_TIME));
@@ -292,6 +314,10 @@ impl geng::State for GameState {
             model_delta_time -= r32(MAX_DELTA_TIME);
         }
         self.model.update(delta_time);
+
+        // Game events
+        let events = std::mem::take(&mut self.model.events);
+        self.handle_game_events(events);
 
         // UI events
         for (widget, (tile, _)) in self
