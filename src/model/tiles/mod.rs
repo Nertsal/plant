@@ -9,7 +9,20 @@ pub struct Tile {
 impl Tile {
     pub fn new(kind: TileKind) -> Self {
         Self {
-            state: TileState::Spawning(Lifetime::new(R32::ONE)),
+            state: TileState::Spawning {
+                timer: Lifetime::new(R32::ONE),
+                from_position: None,
+            },
+            kind,
+        }
+    }
+
+    pub fn new_from(kind: TileKind, from_position: vec2<FCoord>) -> Self {
+        Self {
+            state: TileState::Spawning {
+                timer: Lifetime::new(R32::ONE),
+                from_position: Some(from_position),
+            },
             kind,
         }
     }
@@ -177,9 +190,17 @@ impl Lifetime {
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub enum TileState {
-    Spawning(Lifetime),
+    Spawning {
+        timer: Lifetime,
+        /// For example, when water is ejected from a sprinkler, it starts the animation in the sprinkler's position.
+        from_position: Option<vec2<FCoord>>,
+    },
     Idle,
-    Despawning(Lifetime),
+    Despawning {
+        timer: Lifetime,
+        /// For example, when water is drained, it end the animation in the drainer's position.
+        to_position: Option<vec2<FCoord>>,
+    },
     /// Similar to [`Spawning`] but different semantics.
     Transforming(Lifetime),
     Moving {
@@ -196,12 +217,27 @@ impl TileState {
     }
 
     pub fn alive(&self) -> bool {
-        !matches!(self, TileState::Spawning(_) | TileState::Despawning(_))
+        !matches!(
+            self,
+            TileState::Spawning { .. } | TileState::Despawning { .. }
+        )
     }
 
     pub fn despawn(&mut self) {
-        if !matches!(self, Self::Despawning(_)) {
-            *self = Self::Despawning(Lifetime::new(Time::ONE));
+        if !matches!(self, Self::Despawning { .. }) {
+            *self = Self::Despawning {
+                timer: Lifetime::new(Time::ONE),
+                to_position: None,
+            };
+        }
+    }
+
+    pub fn despawn_into(&mut self, to_position: vec2<FCoord>) {
+        if !matches!(self, Self::Despawning { .. }) {
+            *self = Self::Despawning {
+                timer: Lifetime::new(Time::ONE),
+                to_position: Some(to_position),
+            };
         }
     }
 

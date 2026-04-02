@@ -8,16 +8,16 @@ impl DroneTarget {
             DroneTarget::MoveTo(_) => true,
             DroneTarget::Collect(pos) => grid.get_tile(pos).is_some_and(|tile| {
                 tile.tile.kind.is_collectable()
-                    && !matches!(tile.tile.state, TileState::Despawning(_))
+                    && !matches!(tile.tile.state, TileState::Despawning { .. })
             }),
             DroneTarget::CutPlant(pos) => grid.get_tile(pos).is_some_and(|tile| {
                 matches!(tile.tile.kind, TileKind::Leaf(_) | TileKind::Seed(_))
-                    && !matches!(tile.tile.state, TileState::Despawning(_))
+                    && !matches!(tile.tile.state, TileState::Despawning { .. })
             }),
             DroneTarget::PlaceTile(_, _) | DroneTarget::BuyTile(_, _) => true,
             DroneTarget::KillBug(id) => grid.all_tiles().any(|tile| {
                 if let TileKind::Bug(bug) = &tile.tile.kind
-                    && !matches!(tile.tile.state, TileState::Despawning(_))
+                    && !matches!(tile.tile.state, TileState::Despawning { .. })
                 {
                     bug.id == id
                 } else {
@@ -197,7 +197,7 @@ impl Model {
             DroneTarget::Collect(position) => {
                 if action_finish {
                     self.drone.target = None;
-                    self.collect(position);
+                    self.collect(position, None);
                 }
             }
             DroneTarget::CutPlant(position) => {

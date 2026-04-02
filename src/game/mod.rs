@@ -184,7 +184,7 @@ impl GameState {
                 .model
                 .grid
                 .get_tile(target)
-                .is_some_and(|tile| !matches!(tile.tile.state, TileState::Despawning(_)))
+                .is_some_and(|tile| !matches!(tile.tile.state, TileState::Despawning { .. }))
             {
                 if self.model.interact_with(target, false).is_some() {
                     self.start_drag(DragTarget::Interact);

@@ -60,7 +60,7 @@ impl Model {
         };
 
         match &mut tile.tile.state {
-            TileState::Spawning(timer) | TileState::Transforming(timer) => {
+            TileState::Spawning { timer, .. } | TileState::Transforming(timer) => {
                 timer.change(-delta_time / self.config.animations.tile_spawn);
                 if timer.remaining <= Time::ZERO {
                     tile.tile.state = TileState::Idle;
@@ -81,7 +81,7 @@ impl Model {
                     tile.tile.state = TileState::DroneAction;
                 }
             }
-            TileState::Despawning(timer) => {
+            TileState::Despawning { timer, .. } => {
                 timer.change(-delta_time / self.config.animations.tile_despawn);
                 if timer.remaining <= Time::ZERO {
                     self.grid.remove_tile(pos);
@@ -491,18 +491,24 @@ impl Model {
                     {
                         // Pipe water to a sprinkler
                         if let Some(water) = self.grid.get_tile_mut(water) {
-                            water.tile.state.despawn();
+                            water
+                                .tile
+                                .state
+                                .despawn_into(self.grid_visual.tile_center(pos));
                         }
                         self.grid.set_tile(
                             target,
-                            Tile::new(TileKind::Water(Lifetime::new(self.config.water_lifetime))),
+                            Tile::new_from(
+                                TileKind::Water(Lifetime::new(self.config.water_lifetime)),
+                                self.grid_visual.tile_center(sprinkler_pos),
+                            ),
                         );
                         if let Some(sprinkler) = self.grid.get_tile_mut(sprinkler_pos) {
                             sprinkler.tile.state.transform()
                         }
                     } else {
                         // Collect water to player inventory
-                        self.collect(water);
+                        self.collect(water, Some(self.grid_visual.tile_center(pos)));
                     }
                 }
             }

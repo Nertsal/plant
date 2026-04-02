@@ -217,7 +217,27 @@ impl GameRender {
 
         // Tiles
         let mut positions: Vec<_> = model.grid.all_positions().collect();
-        positions.sort_by_key(|pos| (-pos.y, pos.x));
+        positions.sort_by_key(|pos| {
+            let layer = if let Some(tile) = model.grid.get_tile(*pos) {
+                if let TileState::Spawning {
+                    from_position: Some(_),
+                    ..
+                }
+                | TileState::Despawning {
+                    to_position: Some(_),
+                    ..
+                } = tile.tile.state
+                {
+                    -1
+                } else {
+                    0
+                }
+            } else {
+                0
+            };
+            (layer, (-pos.y, pos.x))
+        });
+        // TODO: instancing
         for pos in positions {
             let Some(tile) = model.grid.get_tile(pos) else {
                 continue;
@@ -250,13 +270,20 @@ impl GameRender {
             let mut transform = mat3::identity();
             let mut shake = false;
             match &tile.tile.state {
-                TileState::Spawning(timer) => {
+                TileState::Spawning {
+                    timer,
+                    from_position,
+                } => {
                     let t = timer.ratio().as_f32();
                     let t = 1.0 - crate::util::ease_out_elastic_with(1.0 - t, 2.0, 1.0);
                     let scale = 1.0 + 0.15 * t;
                     let rotation = -10.0 * t;
-                    transform *=
-                        mat3::scale_uniform(scale) * mat3::rotate(Angle::from_degrees(rotation));
+                    let pos = from_position.map_or(vec2::ZERO, |from| {
+                        (from - model.grid_visual.tile_center(tile.pos)).as_f32() * t
+                    });
+                    transform *= mat3::translate(pos)
+                        * mat3::scale_uniform(scale)
+                        * mat3::rotate(Angle::from_degrees(rotation));
                 }
                 TileState::Transforming(timer) => {
                     let t = timer.ratio().as_f32();
@@ -266,13 +293,17 @@ impl GameRender {
                     transform *=
                         mat3::scale_uniform(scale) * mat3::rotate(Angle::from_degrees(rotation));
                 }
-                TileState::Despawning(timer) => {
+                TileState::Despawning { timer, to_position } => {
                     let t = timer.ratio().as_f32();
                     let t = 1.0 - crate::util::ease_out_elastic_with(1.0 - t, 0.5, 1.0);
                     let scale = 0.9 * t;
                     let rotation = 5.0 + 5.0 * t;
-                    transform *=
-                        mat3::scale_uniform(scale) * mat3::rotate(Angle::from_degrees(rotation));
+                    let pos = to_position.map_or(vec2::ZERO, |to| {
+                        (to - model.grid_visual.tile_center(tile.pos)).as_f32() * (1.0 - t)
+                    });
+                    transform *= mat3::translate(pos)
+                        * mat3::scale_uniform(scale)
+                        * mat3::rotate(Angle::from_degrees(rotation));
                 }
                 TileState::Moving { timer, delta } => {
                     let offset = movement_animation(&model.grid_visual, timer, *delta);
@@ -331,8 +362,7 @@ impl GameRender {
                 // Tile action progress
                 let t = t.as_f32();
                 let pos = Aabb2::point(
-                    model.grid_visual.tile_bounds(pos).center().as_f32()
-                        + vec2(0.0, -8.0) * pixel_scale,
+                    model.grid_visual.tile_center(pos).as_f32() + vec2(0.0, -8.0) * pixel_scale,
                 )
                 .extend_symmetric(vec2(8.0, 2.0) * pixel_scale);
                 self.context.geng.draw2d().quad(
@@ -390,7 +420,7 @@ impl GameRender {
                 _ if tile.tile.kind.transmits_power() => {
                     for neighbor in model.grid.get_neighbors(tile.pos) {
                         if neighbor.tile.kind.transmits_power()
-                            && !matches!(neighbor.tile.state, TileState::Despawning(_))
+                            && !matches!(neighbor.tile.state, TileState::Despawning { .. })
                         {
                             add_connection(tile.pos, neighbor.pos, palette.connection_power);
                         }
@@ -466,7 +496,7 @@ impl GameRender {
             }
             let name = name.or_else(|| {
                 if let Some(tile) = model.grid.get_tile(pos)
-                    && !matches!(tile.tile.state, TileState::Despawning(_))
+                    && !matches!(tile.tile.state, TileState::Despawning { .. })
                     && !matches!(tile.tile.kind, TileKind::GhostBlock(_))
                 {
                     Some(model.tile_interaction(pos).name())
@@ -485,7 +515,7 @@ impl GameRender {
             if model
                 .grid
                 .get_tile(pos)
-                .is_none_or(|tile| matches!(tile.tile.state, TileState::Despawning(_)))
+                .is_none_or(|tile| matches!(tile.tile.state, TileState::Despawning { .. }))
                 && let Some(texture) = sprites.tiles.get_texture(tile)
             {
                 if model.grid.get_tile(pos).is_none() {
@@ -573,10 +603,9 @@ impl GameRender {
             };
             match input_state {
                 InputState::Idle => tile_action(framebuffer),
-                _ if model
-                    .grid
-                    .get_tile(target)
-                    .is_some_and(|tile| !matches!(tile.tile.state, TileState::Despawning(_))) =>
+                _ if model.grid.get_tile(target).is_some_and(|tile| {
+                    !matches!(tile.tile.state, TileState::Despawning { .. })
+                }) =>
                 {
                     tile_action(framebuffer)
                 }

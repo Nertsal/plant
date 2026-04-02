@@ -94,7 +94,7 @@ impl Model {
         if self
             .grid
             .get_tile(target)
-            .is_some_and(|tile| !matches!(tile.tile.state, TileState::Despawning(_)))
+            .is_some_and(|tile| !matches!(tile.tile.state, TileState::Despawning { .. }))
             || !self.inventory.iter().any(|(t, _)| *t == tile)
         {
             return false;
@@ -167,7 +167,7 @@ impl Model {
         self.can_collect(&tile.tile.kind)
     }
 
-    pub fn collect(&mut self, target: vec2<ICoord>) {
+    pub fn collect(&mut self, target: vec2<ICoord>, despawn_into: Option<vec2<FCoord>>) {
         let Some(tile) = self.grid.get_tile(target) else {
             return;
         };
@@ -182,7 +182,11 @@ impl Model {
         };
 
         if tile.tile.kind.is_collectable() {
-            tile.tile.state.despawn();
+            if let Some(pos) = despawn_into {
+                tile.tile.state.despawn_into(pos);
+            } else {
+                tile.tile.state.despawn();
+            }
             let kind = tile.tile.kind.clone();
             self.inventory_add(kind, 1);
             self.context.sfx.play(&self.context.assets.sounds.rock);

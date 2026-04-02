@@ -31,7 +31,7 @@ impl Model {
         for delta in Connections::NEIGHBORS {
             if connections.get(delta).is_some()
                 && self.grid.get_tile(position + delta).is_none_or(|tile| {
-                    matches!(tile.tile.state, TileState::Despawning(_))
+                    matches!(tile.tile.state, TileState::Despawning { .. })
                         || !matches!(tile.tile.kind, TileKind::Leaf(_) | TileKind::Seed(_))
                 })
             {
