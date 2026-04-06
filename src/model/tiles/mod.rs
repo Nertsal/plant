@@ -9,7 +9,20 @@ pub struct Tile {
 impl Tile {
     pub fn new(kind: TileKind) -> Self {
         Self {
-            state: TileState::Spawning(Lifetime::new(R32::ONE)),
+            state: TileState::Spawning {
+                timer: Lifetime::new(R32::ONE),
+                from_position: None,
+            },
+            kind,
+        }
+    }
+
+    pub fn new_from(kind: TileKind, from_position: vec2<FCoord>) -> Self {
+        Self {
+            state: TileState::Spawning {
+                timer: Lifetime::new(R32::ONE),
+                from_position: Some(from_position),
+            },
             kind,
         }
     }
@@ -177,15 +190,25 @@ impl Lifetime {
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub enum TileState {
-    Spawning(Lifetime),
+    Spawning {
+        timer: Lifetime,
+        /// For example, when water is ejected from a sprinkler, it starts the animation in the sprinkler's position.
+        from_position: Option<vec2<FCoord>>,
+    },
     Idle,
-    Despawning(Lifetime),
+    Despawning {
+        timer: Lifetime,
+        /// For example, when water is drained, it end the animation in the drainer's position.
+        to_position: Option<vec2<FCoord>>,
+    },
     /// Similar to [`Spawning`] but different semantics.
     Transforming(Lifetime),
     Moving {
         timer: Lifetime,
         delta: vec2<ICoord>,
     },
+    /// A drone is performing an action on this tile.
+    DroneAction,
 }
 
 impl TileState {
@@ -194,12 +217,27 @@ impl TileState {
     }
 
     pub fn alive(&self) -> bool {
-        !matches!(self, TileState::Spawning(_) | TileState::Despawning(_))
+        !matches!(
+            self,
+            TileState::Spawning { .. } | TileState::Despawning { .. }
+        )
     }
 
     pub fn despawn(&mut self) {
-        if !matches!(self, Self::Despawning(_)) {
-            *self = Self::Despawning(Lifetime::new(Time::ONE));
+        if !matches!(self, Self::Despawning { .. }) {
+            *self = Self::Despawning {
+                timer: Lifetime::new(Time::ONE),
+                to_position: None,
+            };
+        }
+    }
+
+    pub fn despawn_into(&mut self, to_position: vec2<FCoord>) {
+        if !matches!(self, Self::Despawning { .. }) {
+            *self = Self::Despawning {
+                timer: Lifetime::new(Time::ONE),
+                to_position: Some(to_position),
+            };
         }
     }
 
@@ -282,10 +320,10 @@ impl TileKind {
         match self {
             TileKind::GhostBlock(_) => "You are not supposed to see this",
             TileKind::Seed(seed) => match seed.kind {
-                PlantKind::TypeA => "Grows from Dry Soil/ Soil/ Rich Soil",
-                PlantKind::TypeB => "Grows from Soil/ Rich Soil",
-                PlantKind::TypeC => "Grows only from Water",
-                PlantKind::TypeD => "Grows only from Rich Soil",
+                PlantKind::TypeA => "Grows on top of Dry Soil/ Soil/ Rich Soil",
+                PlantKind::TypeB => "Grows on top of Soil/ Rich Soil",
+                PlantKind::TypeC => "Grows only on top of Water",
+                PlantKind::TypeD => "Grows only on top of Rich Soil",
             },
             TileKind::Leaf(leaf) => match leaf.kind {
                 PlantKind::TypeA => "Sells for 3g",
@@ -295,28 +333,30 @@ impl TileKind {
             },
             TileKind::Light(_) => "Plants grow within range\nRequires Power to function",
             TileKind::Soil(state) => match state {
-                SoilState::Dry => "Consumes adjacent Water and turns into soil",
+                SoilState::Dry => "Consumes adjacent Water and turns into Soil",
                 SoilState::Watered => {
                     "Consumes Poop nearby and turns into Rich Soil\nTurns into Dry Soil after plant growth"
                 }
                 SoilState::Rich => "Turns into Dry Soil after plant growth",
             },
-            TileKind::Water(_) => "Spawns around leaves\nDisappears overtime",
-            TileKind::Bug(_) => "Eats Plants and produces Poop\nSpawns in unlit areas",
+            TileKind::Water(_) => "Spawns around Leaves\nDisappears overtime",
+            TileKind::Bug(_) => "Eats Leaves and produces Poop\nSpawns in unlit areas",
             TileKind::Poop(_) => "Can be used to nourish the Soil\nDisappears overtime",
             TileKind::Power => "Provides power to tiles connected with Wires",
             TileKind::Wire(_) => {
-                "Connection between Power and Light\nCan be destroyed by Bugs and Plants"
+                "Connection between Power and Light\nCan be destroyed by Bugs and Leaves"
             }
             TileKind::Drainer => {
                 "Collects Water within range to your inventory or to connected Sprinklers"
             }
-            TileKind::Cutter(_) => "Automatically cuts fully grown adjacent Plants\nRequires Power",
-            TileKind::Pipe(_) => "Connection between water collector and Sprinkler",
+            TileKind::Cutter(_) => "Automatically cuts fully grown adjacent Leaves\nRequires Power",
+            TileKind::Pipe(_) => {
+                "Connection between Drainer and Sprinkler\nCan be destroyed by bugs"
+            }
             TileKind::Sprinkler(_) => {
                 "Ejects Water on adjacent tiles when connected to a Drainer via Pipes"
             }
-            TileKind::Rock => "Blocks plants growth and bugs",
+            TileKind::Rock => "Blocks plants growth and Bugs",
         }
     }
 
@@ -388,6 +428,18 @@ impl TileKind {
                 let config = config.plants.get(&seed.kind)?;
                 Some(seed_energy.floor() / config.growth_capacity)
             }
+            _ => None,
+        }
+    }
+
+    /// `None` if tile does not need power.
+    /// `Some(true)` if tile is powered.
+    /// `Some(false)` if tile is disconnected from power.
+    pub fn is_powered(&self) -> Option<bool> {
+        match self {
+            TileKind::Light(powered) => Some(*powered),
+            TileKind::Wire(powered) => Some(*powered),
+            TileKind::Cutter(cutter) => Some(cutter.powered),
             _ => None,
         }
     }

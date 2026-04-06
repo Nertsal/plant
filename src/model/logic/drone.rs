@@ -8,16 +8,16 @@ impl DroneTarget {
             DroneTarget::MoveTo(_) => true,
             DroneTarget::Collect(pos) => grid.get_tile(pos).is_some_and(|tile| {
                 tile.tile.kind.is_collectable()
-                    && !matches!(tile.tile.state, TileState::Despawning(_))
+                    && !matches!(tile.tile.state, TileState::Despawning { .. })
             }),
             DroneTarget::CutPlant(pos) => grid.get_tile(pos).is_some_and(|tile| {
                 matches!(tile.tile.kind, TileKind::Leaf(_) | TileKind::Seed(_))
-                    && !matches!(tile.tile.state, TileState::Despawning(_))
+                    && !matches!(tile.tile.state, TileState::Despawning { .. })
             }),
             DroneTarget::PlaceTile(_, _) | DroneTarget::BuyTile(_, _) => true,
             DroneTarget::KillBug(id) => grid.all_tiles().any(|tile| {
                 if let TileKind::Bug(bug) = &tile.tile.kind
-                    && !matches!(tile.tile.state, TileState::Despawning(_))
+                    && !matches!(tile.tile.state, TileState::Despawning { .. })
                 {
                     bug.id == id
                 } else {
@@ -70,34 +70,15 @@ impl Model {
             .retain(|action| action.is_relevant(&self.grid));
     }
 
-    pub fn update_drone(&mut self, delta_time: Time) {
-        // Update drone target
-        // Look for jobs
-        if self
-            .drone
-            .target
-            .as_ref()
-            .is_none_or(|target| !target.is_relevant(&self.grid))
-        {
-            self.drone.target = None;
-            if let Some(i) = self
-                .queued_actions
-                .iter()
-                .position(|action| action.is_achievable(self))
-            {
-                self.drone.target = self.queued_actions.remove(i);
-            }
-        }
-
-        // Calculate drone's target position
-        let target_pos = match &self.drone.target {
-            None => self.drone.position,
+    fn get_drone_target_position(&self, target: &Option<DroneTarget>) -> Option<vec2<FCoord>> {
+        match target {
+            None => Some(self.drone.position),
             Some(target) => match *target {
                 DroneTarget::MoveTo(pos)
                 | DroneTarget::Collect(pos)
                 | DroneTarget::CutPlant(pos)
                 | DroneTarget::PlaceTile(pos, _)
-                | DroneTarget::BuyTile(pos, _) => self.grid_visual.tile_bounds(pos).center(),
+                | DroneTarget::BuyTile(pos, _) => Some(self.grid_visual.tile_bounds(pos).center()),
                 DroneTarget::KillBug(bug_id) => {
                     let bug = self.grid.tiles.iter().find(|(_, tile)| {
                         if let TileKind::Bug(bug) = &tile.kind
@@ -108,15 +89,17 @@ impl Model {
                             false
                         }
                     });
-                    match bug {
-                        Some((&pos, _)) => self.grid_visual.tile_bounds(pos).center(),
-                        None => {
-                            self.drone.target = None;
-                            return;
-                        }
-                    }
+                    bug.map(|(pos, _)| self.grid_visual.tile_bounds(*pos).center())
                 }
             },
+        }
+    }
+
+    pub fn update_drone_position(&mut self, delta_time: Time) {
+        // Calculate drone's target position
+        let Some(target_pos) = self.get_drone_target_position(&self.drone.target) else {
+            self.drone.target = None;
+            return;
         };
 
         // Go towards target position
@@ -150,12 +133,40 @@ impl Model {
         } else {
             acceleration
         };
-        self.drone.velocity +=
+        let delta_velocity =
             (target_velocity - self.drone.velocity).clamp_len(..=relevant_acc * delta_time);
-        self.drone.position += self.drone.velocity * delta_time;
+        self.drone.velocity += delta_velocity;
+        self.drone.position +=
+            (self.drone.velocity + delta_velocity * delta_time / r32(2.0)) * delta_time;
+    }
+
+    pub fn update_drone(&mut self, delta_time: Time) {
+        // Update drone target
+        // Look for jobs
+        if self
+            .drone
+            .target
+            .as_ref()
+            .is_none_or(|target| !target.is_relevant(&self.grid))
+        {
+            self.drone.target = None;
+            if let Some(i) = self
+                .queued_actions
+                .iter()
+                .position(|action| action.is_achievable(self))
+            {
+                self.drone.target = self.queued_actions.remove(i);
+            }
+        }
+
+        let Some(target_pos) = self.get_drone_target_position(&self.drone.target) else {
+            self.drone.target = None;
+            return;
+        };
+        let target_distance = (target_pos - self.drone.position).len();
 
         // Action
-        if target_distance.as_f32() < 0.001 {
+        if target_distance - r32(0.01) <= self.config.drone_reach {
             // target within reach
             self.drone_action(delta_time);
         } else {
@@ -186,7 +197,7 @@ impl Model {
             DroneTarget::Collect(position) => {
                 if action_finish {
                     self.drone.target = None;
-                    self.collect(position);
+                    self.collect(position, None);
                 }
             }
             DroneTarget::CutPlant(position) => {
@@ -227,6 +238,8 @@ impl Model {
                             self.inventory.remove(&tile);
                         }
                         self.grid.set_tile(position, Tile::new(tile.clone()));
+                        self.events
+                            .push(GameEvent::Sfx(position, GameSfx::TileBuild));
                     }
                 }
             }
@@ -237,6 +250,8 @@ impl Model {
                     if self.grid.get_tile(position).is_none() && self.money >= cost {
                         self.grid.set_tile(position, Tile::new(tile.clone()));
                         self.money -= cost;
+                        self.events
+                            .push(GameEvent::Sfx(position, GameSfx::TileBuild));
                     }
                 }
             }

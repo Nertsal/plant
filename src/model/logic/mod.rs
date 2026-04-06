@@ -6,6 +6,22 @@ use super::*;
 
 impl Model {
     pub fn update(&mut self, delta_time: Time) {
+        self.simulation_time += delta_time;
+        self.update_drone_position(delta_time);
+
+        // Tiles timers
+        let update_order: Vec<vec2<ICoord>> = self
+            .grid
+            .all_tiles()
+            .sorted_by_key(|tile| tile.tile.kind.update_order())
+            .map(|tile| tile.pos)
+            .collect();
+        for &pos in &update_order {
+            self.update_tile_state(pos, delta_time);
+        }
+    }
+
+    pub fn fixed_update(&mut self, delta_time: Time) {
         self.update_action_queue();
         self.update_drone(delta_time);
 
@@ -16,9 +32,6 @@ impl Model {
             .sorted_by_key(|tile| tile.tile.kind.update_order())
             .map(|tile| tile.pos)
             .collect();
-        for &pos in &update_order {
-            self.update_tile_state(pos, delta_time);
-        }
         for pos in update_order {
             self.tile_logic(pos, delta_time);
         }
@@ -31,8 +44,23 @@ impl Model {
             return;
         };
 
+        let drone_action = match &self.drone.target {
+            Some(target) if self.drone.action_progress > R32::ZERO => match *target {
+                DroneTarget::Collect(target) | DroneTarget::CutPlant(target) => target == pos,
+                DroneTarget::KillBug(bug_id) => {
+                    if let TileKind::Bug(bug) = &tile.tile.kind {
+                        bug.id == bug_id
+                    } else {
+                        false
+                    }
+                }
+                _ => false,
+            },
+            _ => false,
+        };
+
         match &mut tile.tile.state {
-            TileState::Spawning(timer) | TileState::Transforming(timer) => {
+            TileState::Spawning { timer, .. } | TileState::Transforming(timer) => {
                 timer.change(-delta_time / self.config.animations.tile_spawn);
                 if timer.remaining <= Time::ZERO {
                     tile.tile.state = TileState::Idle;
@@ -48,11 +76,20 @@ impl Model {
                     self.grid.set_tile(pos + delta, tile.tile);
                 }
             }
-            TileState::Idle => {}
-            TileState::Despawning(timer) => {
+            TileState::Idle => {
+                if drone_action {
+                    tile.tile.state = TileState::DroneAction;
+                }
+            }
+            TileState::Despawning { timer, .. } => {
                 timer.change(-delta_time / self.config.animations.tile_despawn);
                 if timer.remaining <= Time::ZERO {
                     self.grid.remove_tile(pos);
+                }
+            }
+            TileState::DroneAction => {
+                if !drone_action {
+                    tile.tile.state = TileState::Idle;
                 }
             }
         }
@@ -127,9 +164,12 @@ impl Model {
                         TileKind::Soil(state) => {
                             *state = SoilState::Dry;
                             grow_from.tile.state.transform();
+                            self.events
+                                .push(GameEvent::Sfx(pos, GameSfx::SeedTakeEnergy));
                         }
                         TileKind::Water(_) => {
                             grow_from.tile.state.despawn();
+                            self.events.push(GameEvent::Sfx(pos, GameSfx::WaterConsume));
                         }
                         _ => {}
                     }
@@ -178,6 +218,8 @@ impl Model {
                                     Leaf::new(plant_kind).connected(pos - empty),
                                 )),
                             );
+                            self.events
+                                .push(GameEvent::Sfx(empty, GameSfx::PlantGrowth));
                         }
                     }
                 } else if let Some(tile) = self.grid.get_tile_mut(pos)
@@ -205,6 +247,7 @@ impl Model {
                             *state = SoilState::Watered;
                             soil.tile.state.transform();
                         }
+                        self.events.push(GameEvent::Sfx(pos, GameSfx::WaterConsume));
                     }
                 }
                 SoilState::Watered => {
@@ -222,6 +265,7 @@ impl Model {
                             *state = SoilState::Rich;
                             soil.tile.state.transform();
                         }
+                        self.events.push(GameEvent::Sfx(pos, GameSfx::PoopConsume));
                     }
                 }
                 SoilState::Rich => {}
@@ -242,6 +286,8 @@ impl Model {
                         if lifetime.remaining <= Time::ZERO {
                             // Evaporate
                             tile.tile.state.despawn();
+                            self.events
+                                .push(GameEvent::Sfx(pos, GameSfx::WaterEvaporate));
                         }
                     }
                 }
@@ -259,10 +305,11 @@ impl Model {
                 }
                 let can_move = bug.move_timer <= Time::ZERO;
 
-                let move_towards = |target: vec2<ICoord>, grid: &mut Grid| {
+                let mut move_towards = |target: vec2<ICoord>, grid: &mut Grid| {
                     if !can_move {
                         return;
                     }
+
                     let delta = target - pos;
                     let dir = if delta.x.abs() > delta.y.abs() {
                         vec2(delta.x.signum(), 0)
@@ -270,7 +317,7 @@ impl Model {
                         vec2(0, delta.y.signum())
                     };
 
-                    if bug_can_move_into(grid, tile.pos + dir)
+                    if bug_can_move_into_pos(grid, tile.pos + dir)
                         && let Some(tile) = grid.get_tile_mut(pos)
                         && let TileKind::Bug(bug) = &mut tile.tile.kind
                     {
@@ -287,6 +334,7 @@ impl Model {
                             pos + dir,
                             Tile::new(TileKind::GhostBlock(ExistentialReason::MoveFrom(pos))),
                         );
+                        self.events.push(GameEvent::Sfx(pos, GameSfx::BugMove));
                     }
                 };
 
@@ -302,7 +350,8 @@ impl Model {
                             .grid
                             .all_tiles()
                             .filter(|tile| {
-                                if manhattan_distance(pos, tile.pos) <= 7
+                                if manhattan_distance(pos, tile.pos)
+                                    <= self.config.bug_vision_radius
                                     && tile.tile.state.interactive()
                                     && let TileKind::Leaf(_) = &tile.tile.kind
                                 {
@@ -313,41 +362,49 @@ impl Model {
                             })
                             .min_by_key(|tile| manhattan_distance(pos, tile.pos))
                             .map(|tile| tile.pos);
-                        let target = leaf_target
-                            .or_else(|| {
-                                // Move in available random direction
-                                self.grid
-                                    .get_neighbors_all(pos)
-                                    .filter(|tile| bug_can_move_into(&self.grid, tile.pos))
-                                    .map(|tile| tile.pos)
-                                    .choose(&mut rng)
-                            })
-                            .unwrap_or(pos);
 
                         // Go towards target
-                        if manhattan_distance(pos, target) <= 1
-                            && let Some(tile) = self.grid.get_tile(target)
-                            && let TileKind::Leaf(_) = tile.tile.kind
-                        {
-                            // eat
-                            if let Some(bug) = self.grid.get_tile_mut(pos)
-                                && let TileKind::Bug(bug) = &mut bug.tile.kind
-                                && let BugState::Hungry {
-                                    eating_timer,
-                                    hunger,
-                                } = &mut bug.state
+                        if let Some(target) = leaf_target {
+                            // Go to the leaves
+                            if manhattan_distance(pos, target) <= 1
+                                && let Some(tile) = self.grid.get_tile(target)
+                                && let TileKind::Leaf(_) = tile.tile.kind
                             {
-                                eating_timer.change(-delta_time);
-                                if eating_timer.remaining <= Time::ZERO {
-                                    *eating_timer = Lifetime::new(self.config.bug_eat_time);
-                                    *hunger -= 1;
-                                    self.cut_plant_tile(target, false);
-                                    self.context.sfx.play(&self.context.assets.sounds.bug_eat);
+                                // eat
+                                if let Some(bug) = self.grid.get_tile_mut(pos)
+                                    && let TileKind::Bug(bug) = &mut bug.tile.kind
+                                    && let BugState::Hungry {
+                                        eating_timer,
+                                        hunger,
+                                    } = &mut bug.state
+                                {
+                                    eating_timer.change(-delta_time);
+                                    if eating_timer.remaining <= Time::ZERO {
+                                        *eating_timer = Lifetime::new(self.config.bug_eat_time);
+                                        *hunger -= 1;
+                                        self.cut_plant_tile(target, false);
+                                        self.events.push(GameEvent::Sfx(target, GameSfx::BugEat));
+                                    }
+                                }
+                            } else {
+                                // move towards the plant
+                                if let Some(path) = self.grid.bug_find_path(pos, target)
+                                    && let Some(&next) = path.get(1)
+                                {
+                                    move_towards(next, &mut self.grid);
                                 }
                             }
                         } else {
-                            // move
-                            move_towards(target, &mut self.grid);
+                            // move in available random direction
+                            if let Some(target) = self
+                                .grid
+                                .get_neighbors_all(pos)
+                                .filter(|tile| bug_can_move_into_pos(&self.grid, tile.pos))
+                                .map(|tile| tile.pos)
+                                .choose(&mut rng)
+                            {
+                                move_towards(target, &mut self.grid);
+                            }
                         }
                     }
                     BugState::Pooping(timer) => {
@@ -365,7 +422,7 @@ impl Model {
                                         self.config.poop_lifetime,
                                     ))),
                                 );
-                                self.context.sfx.play(&self.context.assets.sounds.bug_poop);
+                                self.events.push(GameEvent::Sfx(target, GameSfx::BugPoop));
                                 if let Some(bug) = self.grid.get_tile_mut(pos)
                                     && let TileKind::Bug(bug) = &mut bug.tile.kind
                                 {
@@ -388,7 +445,7 @@ impl Model {
                             if let Some(target) = self
                                 .grid
                                 .get_neighbors_all(pos)
-                                .filter(|tile| bug_can_move_into(&self.grid, tile.pos))
+                                .filter(|tile| bug_can_move_into_pos(&self.grid, tile.pos))
                                 .map(|tile| tile.pos)
                                 .choose(&mut rng)
                             {
@@ -402,6 +459,7 @@ impl Model {
                 lifetime.change(-delta_time);
                 if lifetime.remaining <= Time::ZERO {
                     tile.tile.state.despawn();
+                    self.events.push(GameEvent::Sfx(pos, GameSfx::PoopDespawn));
                 }
             }
             TileKind::Drainer => {
@@ -444,18 +502,26 @@ impl Model {
                     {
                         // Pipe water to a sprinkler
                         if let Some(water) = self.grid.get_tile_mut(water) {
-                            water.tile.state.despawn();
+                            water
+                                .tile
+                                .state
+                                .despawn_into(self.grid_visual.tile_center(pos));
                         }
                         self.grid.set_tile(
                             target,
-                            Tile::new(TileKind::Water(Lifetime::new(self.config.water_lifetime))),
+                            Tile::new_from(
+                                TileKind::Water(Lifetime::new(self.config.water_lifetime)),
+                                self.grid_visual.tile_center(sprinkler_pos),
+                            ),
                         );
                         if let Some(sprinkler) = self.grid.get_tile_mut(sprinkler_pos) {
                             sprinkler.tile.state.transform()
                         }
+                        self.events
+                            .push(GameEvent::Sfx(target, GameSfx::WaterSprinkle));
                     } else {
                         // Collect water to player inventory
-                        self.collect(water);
+                        self.collect(water, Some(self.grid_visual.tile_center(pos)));
                     }
                 }
             }
@@ -590,6 +656,11 @@ impl Model {
             }
         }
 
+        if !lost_plants.is_empty() {
+            self.events
+                .push(GameEvent::Sfx(target, GameSfx::PlantHarvest));
+        }
+
         for tile in lost_plants {
             if let Some(tile) = self.grid.get_tile_mut(tile) {
                 tile.tile.state.despawn();
@@ -616,6 +687,7 @@ impl Model {
                 );
                 if self.grid.get_tile(pos).is_none() {
                     self.grid.set_tile(pos, Tile::new(TileKind::Rock));
+                    self.events.push(GameEvent::Sfx(pos, GameSfx::RockSpawn));
                     break;
                 }
             }
@@ -652,6 +724,8 @@ impl Model {
                         target,
                         Tile::new(TileKind::Water(Lifetime::new(self.config.water_lifetime))),
                     );
+                    self.events
+                        .push(GameEvent::Sfx(target, GameSfx::WaterSpawn));
                 }
             }
         }
@@ -687,6 +761,7 @@ impl Model {
                             })),
                         );
                         self.next_id += 1;
+                        self.events.push(GameEvent::Sfx(pos, GameSfx::BugSpawn));
                         break;
                     }
                 }
@@ -694,7 +769,7 @@ impl Model {
         }
     }
 
-    pub fn active_action_at(&mut self, target: vec2<ICoord>) -> Option<(ActionId, &DroneTarget)> {
+    pub fn active_action_at(&self, target: vec2<ICoord>) -> Option<(ActionId, &DroneTarget)> {
         let mut actions = itertools::chain![
             self.drone
                 .target
@@ -720,6 +795,32 @@ impl Model {
             }),
             DroneTarget::MoveTo(_) => false,
         })
+    }
+}
+
+impl Grid {
+    pub fn bug_find_path(
+        &self,
+        from: vec2<ICoord>,
+        plant: vec2<ICoord>,
+    ) -> Option<Vec<vec2<ICoord>>> {
+        pathfinding::directed::astar::astar(
+            &from,
+            |&pos| {
+                self.get_neighbors_all(pos)
+                    .filter(|tile| match tile.tile {
+                        None => true,
+                        Some(tile) => bug_can_move_into(&tile.kind),
+                    })
+                    .map(|tile| (tile.pos, 1))
+            },
+            |&from| manhattan_distance(from, plant),
+            |&pos| {
+                self.get_neighbors(pos)
+                    .any(|tile| matches!(tile.tile.kind, TileKind::Leaf(_)))
+            },
+        )
+        .map(|(p, _)| p)
     }
 }
 
@@ -795,9 +896,13 @@ pub fn manhattan_distance(a: vec2<ICoord>, b: vec2<ICoord>) -> ICoord {
     (a.x - b.x).abs() + (a.y - b.y).abs()
 }
 
-fn bug_can_move_into(grid: &Grid, pos: vec2<ICoord>) -> bool {
+fn bug_can_move_into_pos(grid: &Grid, pos: vec2<ICoord>) -> bool {
     grid.get_tile(pos)
-        .is_none_or(|tile| matches!(tile.tile.kind, TileKind::Wire(_)))
+        .is_none_or(|tile| bug_can_move_into(&tile.tile.kind))
+}
+
+fn bug_can_move_into(tile: &TileKind) -> bool {
+    matches!(tile, TileKind::Wire(_) | TileKind::Pipe(_))
 }
 
 fn seed_grow_direction(only_up: bool) -> Vec<vec2<ICoord>> {

@@ -108,6 +108,10 @@ impl GridVisual {
         .extend_symmetric(-self.tile_margin)
     }
 
+    pub fn tile_center(&self, grid: vec2<ICoord>) -> vec2<FCoord> {
+        self.tile_bounds(grid).center()
+    }
+
     /// World coordinates AABB of the multiple tiles.
     pub fn multitile_bounds(&self, grid: Aabb2<ICoord>) -> Aabb2<FCoord> {
         let min = self.grid_to_world(grid.min);

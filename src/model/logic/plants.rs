@@ -31,7 +31,7 @@ impl Model {
         for delta in Connections::NEIGHBORS {
             if connections.get(delta).is_some()
                 && self.grid.get_tile(position + delta).is_none_or(|tile| {
-                    matches!(tile.tile.state, TileState::Despawning(_))
+                    matches!(tile.tile.state, TileState::Despawning { .. })
                         || !matches!(tile.tile.kind, TileKind::Leaf(_) | TileKind::Seed(_))
                 })
             {
@@ -59,10 +59,9 @@ impl Model {
         let energy_available = plant_seed.map_or(R32::ZERO, |(_, e)| e);
         let plant_seed = plant_seed.map(|(p, _)| p);
 
-        let has_space_to_grow = self
-            .grid
-            .get_neighbors_all(plant.pos)
-            .any(|tile| tile.tile.is_none());
+        let has_space_to_grow = Connections::NEIGHBORS
+            .into_iter()
+            .any(|delta| can_grow_into(plant.pos + delta, &self.grid));
 
         let_leaf!(let mut plant, leaf);
         leaf.connections = connections;
@@ -174,12 +173,13 @@ impl Model {
             let mut leaf = Leaf::new(kind);
             leaf.connections.set(position - grow, Some(()));
             self.grid.set_tile(grow, Tile::new(TileKind::Leaf(leaf)));
-            self.context.sfx.play(&self.context.assets.sounds.grow);
+            self.events.push(GameEvent::Sfx(grow, GameSfx::PlantGrowth));
         }
         if let Some(grow) = grow_right {
             let mut leaf = Leaf::new(kind);
             leaf.connections.set(position - grow, Some(()));
             self.grid.set_tile(grow, Tile::new(TileKind::Leaf(leaf)));
+            self.events.push(GameEvent::Sfx(grow, GameSfx::PlantGrowth));
         }
 
         // Connect

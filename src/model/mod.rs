@@ -15,6 +15,32 @@ pub type Id = usize;
 
 pub const INVENTORY_MAX_SIZE: usize = 10;
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum GameEvent {
+    Sfx(vec2<ICoord>, GameSfx),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum GameSfx {
+    TileBuild,
+    RockSpawn,
+
+    SeedTakeEnergy,
+    PlantGrowth,
+    PlantHarvest,
+    WaterSpawn,
+    WaterConsume,
+    WaterSprinkle,
+    WaterEvaporate,
+
+    BugSpawn,
+    BugMove,
+    BugEat,
+    BugPoop,
+    PoopConsume,
+    PoopDespawn,
+}
+
 pub enum ActionId {
     Drone,
     Queued(usize),
@@ -28,6 +54,7 @@ pub struct Model {
     pub config: Config,
     pub unlocked_shop: Vec<TileKind>,
 
+    pub simulation_time: Time,
     pub next_id: Id,
     /// Actual logic data.
     pub grid: Grid,
@@ -35,6 +62,8 @@ pub struct Model {
     pub drone: Drone,
     pub queued_actions: VecDeque<DroneTarget>,
     pub inventory: LinearMap<TileKind, usize>,
+
+    pub events: Vec<GameEvent>,
 }
 
 impl Model {
@@ -52,6 +81,7 @@ impl Model {
             },
             unlocked_shop: Vec::new(),
 
+            simulation_time: Time::ZERO,
             next_id: 1,
             grid: Grid::new(),
             money: 0,
@@ -65,6 +95,8 @@ impl Model {
             inventory: [(TileKind::Seed(Seed::new(PlantKind::TypeA)), 1)]
                 .into_iter()
                 .collect(),
+
+            events: Vec::new(),
 
             config,
             context,

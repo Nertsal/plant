@@ -7,7 +7,7 @@ use crate::{
     game::{CursorState, GameUI, InputState},
     model::*,
     prelude::*,
-    ui::layout::AreaOps,
+    ui::{context::UiContext, layout::AreaOps},
 };
 
 /// Full size of a single tile in pixels, used for scaling textures to properly fit on the tile.
@@ -41,6 +41,7 @@ pub struct GameRender {
     pub active_highlight: (vec2<ICoord>, Time, Time),
     pub place_highlight: Option<(TileKind, Time)>,
     pub hover_animation: Vec<(vec2<ICoord>, Time)>,
+    pub tile_shake: LinearMap<vec2<ICoord>, (vec2<f32>, bool)>,
 }
 
 impl GameRender {
@@ -51,15 +52,19 @@ impl GameRender {
             active_highlight: (vec2::ZERO, Time::ZERO, Time::ZERO),
             place_highlight: None,
             hover_animation: Vec::new(),
+            tile_shake: LinearMap::new(),
             context,
         }
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub fn draw_game(
         &mut self,
         model: &Model,
         cursor: &CursorState,
         input_state: &InputState,
+        hide_ui: bool,
+        focus_ui: bool,
         framebuffer: &mut ugli::Framebuffer,
         delta_time: Time,
     ) {
@@ -95,6 +100,9 @@ impl GameRender {
         }
         self.hover_animation
             .retain(|(p, time)| *time < Time::ONE || Some(*p) == cursor.grid_pos);
+        // Update tile shake, if the tile hasnt been shaken in last frame, forget about it
+        self.tile_shake
+            .retain(|_, (_, flag)| std::mem::replace(flag, false));
 
         // Update hovered timing
         if Some(self.active_highlight.0) != cursor.grid_pos {
@@ -171,7 +179,8 @@ impl GameRender {
                 if Some(tile.tile.kind.name()) == highlighted_tile.map(|(tile, _)| tile.name())
                     && let Some(range) = tile.tile.kind.action_range(&model.config)
                 {
-                    Some((tile.pos, range, OTHER_RANGE_HIGHLIGHT))
+                    let powered = tile.tile.kind.is_powered().is_none_or(|p| p);
+                    powered.then_some((tile.pos, range, OTHER_RANGE_HIGHLIGHT))
                 } else {
                     None
                 }
@@ -210,7 +219,27 @@ impl GameRender {
 
         // Tiles
         let mut positions: Vec<_> = model.grid.all_positions().collect();
-        positions.sort_by_key(|pos| (-pos.y, pos.x));
+        positions.sort_by_key(|pos| {
+            let layer = if let Some(tile) = model.grid.get_tile(*pos) {
+                if let TileState::Spawning {
+                    from_position: Some(_),
+                    ..
+                }
+                | TileState::Despawning {
+                    to_position: Some(_),
+                    ..
+                } = tile.tile.state
+                {
+                    -1
+                } else {
+                    0
+                }
+            } else {
+                0
+            };
+            (layer, (-pos.y, pos.x))
+        });
+        // TODO: instancing
         for pos in positions {
             let Some(tile) = model.grid.get_tile(pos) else {
                 continue;
@@ -219,32 +248,44 @@ impl GameRender {
                 continue;
             };
             let mut mult = match tile.tile.kind {
-                TileKind::Light(connected)
-                | TileKind::Wire(connected)
-                | TileKind::Cutter(Cutter {
-                    powered: connected, ..
-                })
-                | TileKind::Pipe(connected)
-                | TileKind::Sprinkler(connected) => {
+                TileKind::Pipe(connected) | TileKind::Sprinkler(connected) => {
                     if connected {
                         1.0
                     } else {
-                        0.5
+                        0.6
                     }
                 }
-                TileKind::Leaf(_) if !model.grid.is_tile_lit(pos, &model.config) => 0.5,
-                _ => 1.0,
+                TileKind::Leaf(_) | TileKind::Seed(_)
+                    if !model.grid.is_tile_lit(pos, &model.config) =>
+                {
+                    0.6
+                }
+                _ => {
+                    if let Some(false) = tile.tile.kind.is_powered() {
+                        0.6
+                    } else {
+                        1.0
+                    }
+                }
             };
 
             let mut transform = mat3::identity();
+            let mut shake = false;
             match &tile.tile.state {
-                TileState::Spawning(timer) => {
+                TileState::Spawning {
+                    timer,
+                    from_position,
+                } => {
                     let t = timer.ratio().as_f32();
                     let t = 1.0 - crate::util::ease_out_elastic_with(1.0 - t, 2.0, 1.0);
                     let scale = 1.0 + 0.15 * t;
                     let rotation = -10.0 * t;
-                    transform *=
-                        mat3::scale_uniform(scale) * mat3::rotate(Angle::from_degrees(rotation));
+                    let pos = from_position.map_or(vec2::ZERO, |from| {
+                        (from - model.grid_visual.tile_center(tile.pos)).as_f32() * t
+                    });
+                    transform *= mat3::translate(pos)
+                        * mat3::scale_uniform(scale)
+                        * mat3::rotate(Angle::from_degrees(rotation));
                 }
                 TileState::Transforming(timer) => {
                     let t = timer.ratio().as_f32();
@@ -254,13 +295,17 @@ impl GameRender {
                     transform *=
                         mat3::scale_uniform(scale) * mat3::rotate(Angle::from_degrees(rotation));
                 }
-                TileState::Despawning(timer) => {
+                TileState::Despawning { timer, to_position } => {
                     let t = timer.ratio().as_f32();
                     let t = 1.0 - crate::util::ease_out_elastic_with(1.0 - t, 0.5, 1.0);
                     let scale = 0.9 * t;
                     let rotation = 5.0 + 5.0 * t;
-                    transform *=
-                        mat3::scale_uniform(scale) * mat3::rotate(Angle::from_degrees(rotation));
+                    let pos = to_position.map_or(vec2::ZERO, |to| {
+                        (to - model.grid_visual.tile_center(tile.pos)).as_f32() * (1.0 - t)
+                    });
+                    transform *= mat3::translate(pos)
+                        * mat3::scale_uniform(scale)
+                        * mat3::rotate(Angle::from_degrees(rotation));
                 }
                 TileState::Moving { timer, delta } => {
                     let offset = movement_animation(&model.grid_visual, timer, *delta);
@@ -274,6 +319,21 @@ impl GameRender {
                         transform *= mat3::scale(scale);
                     }
                 }
+                TileState::DroneAction => {
+                    shake = true;
+                }
+            }
+
+            // Tile shake
+            if shake {
+                let (shake, flag) = self.tile_shake.entry(pos).or_insert((vec2::ZERO, true));
+                *flag = true;
+                let t = model.drone.action_progress.as_f32();
+                *shake = *shake * 0.5
+                    + Angle::from_degrees(thread_rng().gen_range(0.0..=360.0)).unit_vec()
+                        * 0.05
+                        * t;
+                transform *= mat3::translate(*shake);
             }
 
             if highlighted_tiles.contains(&pos) {
@@ -297,14 +357,14 @@ impl GameRender {
                 framebuffer,
             );
 
-            if tile.tile.state.alive()
+            if !hide_ui
+                && tile.tile.state.alive()
                 && let Some(t) = tile.tile.kind.action_progress(&model.config)
             {
                 // Tile action progress
                 let t = t.as_f32();
                 let pos = Aabb2::point(
-                    model.grid_visual.tile_bounds(pos).center().as_f32()
-                        + vec2(0.0, -8.0) * pixel_scale,
+                    model.grid_visual.tile_center(pos).as_f32() + vec2(0.0, -8.0) * pixel_scale,
                 )
                 .extend_symmetric(vec2(8.0, 2.0) * pixel_scale);
                 self.context.geng.draw2d().quad(
@@ -361,7 +421,9 @@ impl GameRender {
                 }
                 _ if tile.tile.kind.transmits_power() => {
                     for neighbor in model.grid.get_neighbors(tile.pos) {
-                        if neighbor.tile.kind.transmits_power() {
+                        if neighbor.tile.kind.transmits_power()
+                            && !matches!(neighbor.tile.state, TileState::Despawning { .. })
+                        {
                             add_connection(tile.pos, neighbor.pos, palette.connection_power);
                         }
                     }
@@ -436,6 +498,7 @@ impl GameRender {
             }
             let name = name.or_else(|| {
                 if let Some(tile) = model.grid.get_tile(pos)
+                    && !matches!(tile.tile.state, TileState::Despawning { .. })
                     && !matches!(tile.tile.kind, TileKind::GhostBlock(_))
                 {
                     Some(model.tile_interaction(pos).name())
@@ -451,17 +514,22 @@ impl GameRender {
                           tile: &TileKind,
                           color: Color,
                           framebuffer: &mut ugli::Framebuffer<'_>| {
-            if model.grid.get_tile(pos).is_none()
+            if model
+                .grid
+                .get_tile(pos)
+                .is_none_or(|tile| matches!(tile.tile.state, TileState::Despawning { .. }))
                 && let Some(texture) = sprites.tiles.get_texture(tile)
             {
-                self.util.draw_on_tile(
-                    &model.grid_visual,
-                    pos,
-                    Color::new(0.7, 0.7, 0.7, HOVER_ALPHA),
-                    texture,
-                    &model.camera,
-                    framebuffer,
-                );
+                if model.grid.get_tile(pos).is_none() {
+                    self.util.draw_on_tile(
+                        &model.grid_visual,
+                        pos,
+                        Color::new(0.7, 0.7, 0.7, HOVER_ALPHA),
+                        texture,
+                        &model.camera,
+                        framebuffer,
+                    );
+                }
                 tile_highlight(Some(DroneAction::PlaceTile.name()), pos, color, framebuffer);
             }
         };
@@ -507,34 +575,41 @@ impl GameRender {
         }
 
         // Input state
-        if let Some(target) = cursor.grid_pos {
+        if !focus_ui && let Some(target) = cursor.grid_pos {
+            let tile_action = |framebuffer: &mut ugli::Framebuffer| {
+                let color = if let Some(tile) = model.grid.get_tile(target)
+                    && let TileKind::Bug(_) = tile.tile.kind
+                {
+                    Color::new(0.7, 0.1, 0.1, 0.5)
+                } else {
+                    Color::new(0.7, 0.7, 0.7, 0.5)
+                };
+                tile_highlight(None, target, color, framebuffer);
+                if let Some(tile) = model.grid.get_tile(target) {
+                    let pos = model
+                        .grid_visual
+                        .tile_bounds(target)
+                        .as_f32()
+                        .align_pos(vec2(0.0, 0.0));
+                    self.tile_description(
+                        pos,
+                        6.0,
+                        0.5,
+                        &tile.tile.kind,
+                        false,
+                        pixel_scale,
+                        &model.camera,
+                        framebuffer,
+                    );
+                }
+            };
             match input_state {
-                InputState::Idle => {
-                    let color = if let Some(tile) = model.grid.get_tile(target)
-                        && let TileKind::Bug(_) = tile.tile.kind
-                    {
-                        Color::new(0.7, 0.1, 0.1, 0.5)
-                    } else {
-                        Color::new(0.7, 0.7, 0.7, 0.5)
-                    };
-                    tile_highlight(None, target, color, framebuffer);
-                    if let Some(tile) = model.grid.get_tile(target) {
-                        let pos = model
-                            .grid_visual
-                            .tile_bounds(target)
-                            .as_f32()
-                            .align_pos(vec2(0.0, 0.0));
-                        self.tile_description(
-                            pos,
-                            6.0,
-                            0.5,
-                            &tile.tile.kind,
-                            false,
-                            pixel_scale,
-                            &model.camera,
-                            framebuffer,
-                        );
-                    }
+                InputState::Idle => tile_action(framebuffer),
+                _ if model.grid.get_tile(target).is_some_and(|tile| {
+                    !matches!(tile.tile.state, TileState::Despawning { .. })
+                }) =>
+                {
+                    tile_action(framebuffer)
                 }
                 InputState::PlaceTile(tile) | InputState::BuyTile(tile) => {
                     ghost_tile(target, tile, Color::new(0.7, 0.7, 0.7, 0.5), framebuffer);
@@ -558,7 +633,7 @@ impl GameRender {
             &model.camera,
             framebuffer,
         );
-        if model.drone.action_progress > R32::ZERO {
+        if !hide_ui && model.drone.action_progress > R32::ZERO {
             // Drone progress
             let t = model.drone.action_progress.as_f32();
             let pos = Aabb2::point(model.drone.position.as_f32() + vec2(0.0, -10.0) * pixel_scale)
@@ -577,7 +652,14 @@ impl GameRender {
         }
     }
 
-    pub fn draw_ui(&mut self, ui: &GameUI, model: &Model, framebuffer: &mut ugli::Framebuffer) {
+    pub fn draw_ui(
+        &mut self,
+        ui: &GameUI,
+        model: &Model,
+        input_state: &InputState,
+        ui_context: &UiContext,
+        framebuffer: &mut ugli::Framebuffer,
+    ) {
         let assets = self.context.assets.clone();
         let sprites = &assets.sprites;
         let palette = &assets.palette;
@@ -734,11 +816,26 @@ impl GameRender {
                 );
             }
         }
+
+        // Placement ghost
+        if let InputState::PlaceTile(kind) | InputState::BuyTile(kind) = input_state
+            && (ui.inventory.hovered || ui.shop.hovered)
+            && let Some(texture) = sprites.tiles.get_texture(kind)
+        {
+            let color = Color::new(0.7, 0.7, 0.7, HOVER_ALPHA);
+            let size = vec2(28.0, 28.0) * pixel_scale;
+            let quad = Aabb2::point(ui_context.cursor.position).extend_symmetric(size / 2.0);
+            self.context.geng.draw2d().draw2d(
+                framebuffer,
+                &geng::PixelPerfectCamera,
+                &draw2d::TexturedQuad::colored(quad, &**texture, color),
+            );
+        }
     }
 
     #[allow(clippy::too_many_arguments)]
     fn tile_description(
-        &mut self,
+        &self,
         pos: vec2<f32>,
         width: f32,
         font_size: f32,
