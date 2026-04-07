@@ -26,11 +26,11 @@ const SHOP_TILE_TOO_EXPENSIVE: f32 = 0.5;
 const HOVER_ANIMATION_TIME: f32 = 0.5;
 /// Duration of the hover highlight transition.
 const HIGHLIGHT_TRANSITION: f32 = 0.25;
-/// Extra brightness of the higlighted tiles.
+/// Extra brightness of the highlighted tiles.
 const HOVER_HIGHLIGHT: f32 = 0.15;
 /// Speed of the hover highlighting blinking.
 const HOVER_BLINK_SPEED: f32 = 4.0;
-/// Relative brightness of the higlighted range for the tiles that match the hovered one.
+/// Relative brightness of the highlighted range for the tiles that match the hovered one.
 const OTHER_RANGE_HIGHLIGHT: f32 = 0.4;
 
 pub struct GameRender {
@@ -585,7 +585,9 @@ impl GameRender {
                     Color::new(0.7, 0.7, 0.7, 0.5)
                 };
                 tile_highlight(None, target, color, framebuffer);
-                if let Some(tile) = model.grid.get_tile(target) {
+                if let Some(tile) = model.grid.get_tile(target)
+                    && tile.tile.state.alive()
+                {
                     let pos = model
                         .grid_visual
                         .tile_bounds(target)
