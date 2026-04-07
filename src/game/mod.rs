@@ -40,6 +40,8 @@ pub struct Drag {
     pub from_real_time: Time,
     pub has_moved: bool,
     pub target: DragTarget,
+    /// Changes input state if the drag has no effect.
+    pub next_state: Option<InputState>,
 }
 
 pub enum DragTarget {
@@ -99,7 +101,7 @@ impl GameState {
         game
     }
 
-    fn click(&mut self) {
+    fn click(&mut self, drag: Option<Drag>) {
         if self.focus_ui {
             // Focus UI first
             return;
@@ -108,11 +110,17 @@ impl GameState {
         if let Some(target) = self.cursor.grid_pos
             && let InputState::Idle = self.input_state
         {
-            self.model.interact_with(target, true);
+            let interaction = self.model.interact_with(target, true);
+            if dbg!(interaction).is_none()
+                && let Some(drag) = drag
+                && let Some(state) = dbg!(drag.next_state)
+            {
+                self.input_state = state;
+            }
         }
     }
 
-    fn start_drag(&mut self, target: DragTarget) {
+    fn start_drag(&mut self, target: DragTarget, next_state: Option<InputState>) {
         self.drag = Some(Drag {
             from_world: match target {
                 DragTarget::Camera => self.model.camera.center.as_r32(),
@@ -122,6 +130,7 @@ impl GameState {
             from_real_time: self.real_time,
             has_moved: false,
             target,
+            next_state,
         });
         self.update_drag();
     }
@@ -190,19 +199,30 @@ impl GameState {
                 .get_tile(target)
                 .is_some_and(|tile| !matches!(tile.tile.state, TileState::Despawning { .. }))
             {
-                if self.model.interact_with(target, false).is_some() {
-                    self.start_drag(DragTarget::Interact);
+                // Clicked on an active tile
+                if let Some(interaction) = self.model.interact_with(target, false) {
+                    let next_state = if let InputState::Idle = self.input_state
+                        && let DroneTarget::Collect(pos) = interaction
+                        && let Some(tile) = self.model.grid.get_tile(pos)
+                    {
+                        // Ability to immediately replace the tile in a different place
+                        Some(InputState::PlaceTile(tile.tile.kind.clone().normalized()))
+                    } else {
+                        None
+                    };
+                    self.start_drag(DragTarget::Interact, next_state);
                 }
             } else {
                 match &self.input_state {
                     InputState::Idle => {
+                        // Clicked on empty space or inactive tile
                         self.model.interact_with(target, false);
-                        self.start_drag(DragTarget::Interact);
+                        self.start_drag(DragTarget::Interact, None);
                     }
                     InputState::PlaceTile(tile) => {
                         self.model.place_tile(target, tile.clone());
                         if self.model.can_place_tile(tile, true) {
-                            self.start_drag(DragTarget::PlaceTile(tile.clone()));
+                            self.start_drag(DragTarget::PlaceTile(tile.clone()), None);
                         } else {
                             self.input_state = InputState::Idle;
                         }
@@ -210,7 +230,7 @@ impl GameState {
                     InputState::BuyTile(tile) => {
                         self.model.buy_tile(target, tile.clone());
                         if self.model.can_buy_tile(tile, true) {
-                            self.start_drag(DragTarget::BuyTile(tile.clone()));
+                            self.start_drag(DragTarget::BuyTile(tile.clone()), None);
                         } else {
                             self.input_state = InputState::Idle;
                         }
@@ -432,6 +452,7 @@ impl geng::State for GameState {
                             from_real_time: self.real_time,
                             has_moved: false,
                             target: DragTarget::CancelQueued,
+                            next_state: None,
                         });
                     } else {
                         self.drag = Some(Drag {
@@ -440,6 +461,7 @@ impl geng::State for GameState {
                             from_real_time: self.real_time,
                             has_moved: false,
                             target: DragTarget::Camera,
+                            next_state: None,
                         });
                     }
                 }
@@ -470,13 +492,13 @@ impl geng::State for GameState {
                         }
                     }
                     geng::MouseButton::Left => {
-                        self.drag.take();
+                        let drag = self.drag.take();
                         if let Some((from_screen, from_real_time)) = self.cursor.pressed
                             && (self.cursor.screen_pos - from_screen).len_sqr() < CLICK_MAX_DISTANCE
                             && (self.real_time - from_real_time).as_f32() < CLICK_MAX_DURATION
                         {
                             // Short left click
-                            self.click();
+                            self.click(drag);
                         }
                     }
                 }
