@@ -820,6 +820,21 @@ impl GameRender {
                 );
             }
         }
+        for (widget, (tile, _)) in ui.inventory_items.iter().zip(&model.inventory) {
+            if widget.hovered {
+                self.tile_description(
+                    widget.position.top_right() + vec2(5.0, 0.0) * pixel_scale,
+                    5.0 * pixel_scale * TILE_SIZE_PIXELS.y as f32,
+                    0.4 * pixel_scale * TILE_SIZE_PIXELS.y as f32,
+                    tile,
+                    model,
+                    true,
+                    pixel_scale,
+                    &geng::PixelPerfectCamera,
+                    framebuffer,
+                );
+            }
+        }
 
         // Placement ghost
         if let InputState::PlaceTile(kind) | InputState::BuyTile(kind) = input_state
@@ -896,7 +911,7 @@ impl GameRender {
                 offset.x = screen.max.x - screen_pos.max.x;
             }
             if screen_pos.min.y < screen.min.y {
-                offset.y = screen_pos.min.y - screen.min.y;
+                offset.y = screen.min.y - screen_pos.min.y;
             }
             let target =
                 camera.screen_to_world(framebuffer.size().as_f32(), screen_pos.center() + offset);
